@@ -1,0 +1,8 @@
+
+{
+  "name": "Hospitonet - Your Healthcare Companion",
+  "description": "A comprehensive healthcare application for booking appointments, managing medical records, and ordering medicines with a modern, cyan-blue UI.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
