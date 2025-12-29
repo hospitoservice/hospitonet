@@ -56,6 +56,8 @@ const AppContent: React.FC = () => {
       <main className="flex-1 overflow-y-auto hide-scrollbar pt-0">
         <Routes>
           <Route path="/" element={<HomeScreen onNavigate={handleNavigate} />} />
+          <Route path="/home" element={<HomeScreen onNavigate={handleNavigate} />} />
+          <Route path="/hospitonet" element={<HomeScreen onNavigate={handleNavigate} />} />
           <Route path="/favourites" element={<FavouritesScreen />} />
           <Route path="/notifications" element={<NotificationScreen />} />
           <Route path="/profile" element={<ProfileScreen onLogout={() => handleNavigate(Screen.LOGIN)} />} />
@@ -95,15 +97,15 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Dark Mode Toggle */}
-      {currentScreen !== Screen.LOGIN && (
-        <button 
-          onClick={() => setIsDarkMode(!isDarkMode)}
-          className="fixed bottom-28 right-4 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg z-[60] border border-gray-100 dark:border-gray-700 transition-transform active:scale-90"
-        >
-          <span className="material-icons-round text-primary block dark:hidden">dark_mode</span>
-          <span className="material-icons-round text-yellow-400 hidden dark:block">light_mode</span>
-        </button>
-      )}
+      {/*{currentScreen !== Screen.LOGIN && (*/}
+      {/*  <button */}
+      {/*    onClick={() => setIsDarkMode(!isDarkMode)}*/}
+      {/*    className="fixed bottom-28 right-4 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg z-[60] border border-gray-100 dark:border-gray-700 transition-transform active:scale-90"*/}
+      {/*  >*/}
+      {/*    <span className="material-icons-round text-primary block dark:hidden">dark_mode</span>*/}
+      {/*    <span className="material-icons-round text-yellow-400 hidden dark:block">light_mode</span>*/}
+      {/*  </button>*/}
+      {/*)}*/}
 
       <style>{`
         :root {
