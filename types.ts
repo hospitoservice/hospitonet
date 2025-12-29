@@ -8,7 +8,8 @@ export enum Screen {
   PROFILE = 'profile',
   FAVOURITES = 'favourites',
   ASSISTANT = 'assistant',
-  NOTIFICATIONS = 'notifications'
+  NOTIFICATIONS = 'notifications',
+  LABTESTS = 'lab-tests'
 }
 
 export interface Doctor {

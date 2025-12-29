@@ -150,7 +150,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           {[
             { id: Screen.MEDICINES, label: 'Medicine', icon: 'local_pharmacy' },
             { id: Screen.HOSPITALS, label: 'Appointment', icon: 'calendar_month' },
-            { id: Screen.RECORDS, label: 'Lab Tests', icon: 'science' },
+            { id: Screen.LABTESTS, label: 'Lab Tests', icon: 'science' },
             { id: Screen.RECORDS, label: 'Records', icon: 'description' },
             { id: Screen.HOME, label: 'Consult', icon: 'videocam' },
             { id: Screen.HOSPITALS, label: 'Hospitals', icon: 'medical_services' },

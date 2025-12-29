@@ -118,7 +118,10 @@ const HospitalsScreen: React.FC = () => {
                         <div className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">
                           <span className="text-sm font-black text-primary">₹{hosp.consultationFee}</span>
                         </div>
-                        <button className="bg-primary hover:brightness-110 text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl shadow-lg shadow-primary/20 transition-all active:translate-y-0.5">
+                        <button
+                            onClick={() => navigate('/book-appointment', { state: { hospital: hosp } })}
+                            className="bg-primary hover:bg-primary-dark text-white text-[10px] font-black uppercase tracking-widest px-4 py-2.5 rounded-xl shadow-lg shadow-primary/20 transition-all active:translate-y-0.5"
+                        >
                           Book Visit
                         </button>
                       </div>

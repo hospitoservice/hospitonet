@@ -168,7 +168,7 @@ const MedicinesScreen: React.FC = () => {
         </div>
       </div>
 
-      <main className="mt-24 px-6 pb-40">
+      <main className="mt-32 px-6 pb-40">
         {/* Banner */}
         <div className="mb-8 rounded-[2.5rem] overflow-hidden shadow-2xl relative h-48 w-full bg-gray-900 flex items-center justify-between p-8 group cursor-pointer transition-transform active:scale-[0.98]">
           <div className="absolute inset-0 bg-gradient-to-br from-cyan-600 to-blue-700 opacity-90 group-hover:opacity-100 transition-opacity"></div>

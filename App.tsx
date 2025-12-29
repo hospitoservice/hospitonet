@@ -15,6 +15,8 @@ import LoginScreen from '@/src/screens/LoginScreen';
 import BottomNav from '@/src/components/BottomNav';
 import NotificationScreen from "@/src/screens/NotificationScreen.tsx";
 import OrderScreen from "@/src/screens/OrderScreen.tsx";
+import LabtestScreen from "@/src/screens/LabtestScreen.tsx";
+import AppointmentBookingScreen from "@/src/screens/AppointmentBookingScreen.tsx";
 
 const AppContent: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -46,13 +48,12 @@ const AppContent: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen max-w-md mx-auto bg-gray-50 dark:bg-gray-900 shadow-2xl relative flex flex-col transition-colors duration-200">
+    <>
       {/* Mock Status Bar */}
       <div className="h-10 w-full flex items-center justify-between px-6 pt-2 z-50 bg-transparent absolute top-0 pointer-events-none">
-        <span className="text-xs font-semibold text-gray-900 dark:text-white">9:41</span>
       </div>
 
-      <main className="flex-1 overflow-y-auto hide-scrollbar pt-10">
+      <main className="flex-1 overflow-y-auto hide-scrollbar pt-0">
         <Routes>
           <Route path="/" element={<HomeScreen onNavigate={handleNavigate} />} />
           <Route path="/favourites" element={<FavouritesScreen />} />
@@ -64,6 +65,8 @@ const AppContent: React.FC = () => {
           <Route path="/assistant" element={<AssistantScreen onBack={() => handleNavigate(Screen.HOME)} />} />
           <Route path="/login" element={<LoginScreen onLogin={() => handleNavigate(Screen.HOME)} />} />
           <Route path="/orders" element={<OrderScreen />} />
+          <Route path="/lab-tests" element={<LabtestScreen />} />
+          <Route path="/book-appointment" element={<AppointmentBookingScreen />} />
           
           {/* 404 - Not Found */}
           <Route path="*" element={
@@ -114,7 +117,7 @@ const AppContent: React.FC = () => {
         .from-primary { --tw-gradient-from: var(--primary-color) var(--tw-gradient-from-position); }
         .to-primary { --tw-gradient-to: var(--primary-dark) var(--tw-gradient-to-position); }
       `}</style>
-    </div>
+    </>
   );
 };
 
