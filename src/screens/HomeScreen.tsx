@@ -1,6 +1,6 @@
-
 import React, { useState } from 'react';
-import { Screen, Doctor } from '../types';
+import { Screen, Doctor } from '../../types.ts';
+import {LOCATIONS} from "@/src/resources/Location";
 
 interface HomeScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -12,16 +12,10 @@ const TOP_SPECIALISTS: Doctor[] = [
   { id: '3', name: 'Dr. Emily Chen', specialty: 'Neurologist', hospital: 'Care Hospital', rating: 4.8, image: 'https://picsum.photos/seed/doc3/200/200' },
 ];
 
-const LOCATIONS = [
-  'Hyderabad, TG',
-  'Bangalore, KA',
-  'Mumbai, MH',
-  'Delhi, DL',
-  'Chennai, TN'
-];
+const LOCATION = LOCATIONS;
 
 const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
-  const [selectedLocation, setSelectedLocation] = useState(LOCATIONS[0]);
+  const [selectedLocation, setSelectedLocation] = useState(LOCATION[0]);
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
 
   return (
@@ -58,7 +52,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                     <div className="px-4 py-2 mb-1">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Select City</p>
                     </div>
-                    {LOCATIONS.map((loc) => (
+                    {LOCATION.map((loc) => (
                       <button
                         key={loc}
                         onClick={() => {
@@ -77,11 +71,16 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
             </div>
           </div>
           <div className="flex gap-2">
-            <button className="p-2.5 rounded-2xl bg-white dark:bg-gray-800 shadow-sm text-gray-500 dark:text-gray-400 border border-gray-100 dark:border-gray-700 active:scale-95 transition-all">
-              <span className="material-icons-outlined text-xl">favorite_border</span>
+            <button
+                onClick={() => onNavigate(Screen.FAVOURITES)}
+                className="w-12 h-12 rounded-2xl bg-white dark:bg-gray-800 flex items-center justify-center transition-transform active:scale-90 shadow-sm border border-gray-100 dark:border-gray-700">
+              <span className="material-icons-round text-primary text-2xl">favorite_border</span>
             </button>
-            <button className="p-2.5 rounded-2xl bg-white dark:bg-gray-800 shadow-sm text-gray-500 dark:text-gray-400 relative border border-gray-100 dark:border-gray-700 active:scale-95 transition-all">
-              <span className="material-icons-outlined text-xl">notifications_none</span>
+
+            <button
+                onClick={() => onNavigate(Screen.NOTIFICATIONS)}
+                className="w-12 h-12 rounded-2xl bg-white dark:bg-gray-800 flex items-center justify-center transition-transform active:scale-90 shadow-sm border border-gray-100 dark:border-gray-700">
+              <span className="material-icons-round text-primary text-2xl">notifications_none</span>
               <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
             </button>
           </div>

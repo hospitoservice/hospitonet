@@ -1,10 +1,36 @@
 
 import React, { useState } from 'react';
-import { Appointment } from '../types';
+import { Appointment } from '../../types.ts';
+import { useNavigate } from 'react-router-dom';
 
 interface ProfileScreenProps {
   onLogout: () => void;
 }
+
+const UPCOMING_APPOINTMENTS: Appointment[] = [
+  {
+    id: '1',
+    doctorName: 'Dr. Sarah Johnson',
+    specialty: 'Cardiologist',
+    hospital: 'Apollo Hospital',
+    date: 'Feb 24, 2026',
+    time: '10:30 AM',
+    status: 'Upcoming',
+    image: 'https://picsum.photos/seed/doc1/100/100',
+    prescription : []
+  },
+  {
+    id: '2',
+    doctorName: 'Dr. Aman Gupta',
+    specialty: 'General Physician',
+    hospital: 'Yashoda Hospital',
+    date: 'Jan 12, 2026',
+    time: '02:00 PM',
+    status: 'Upcoming',
+    image: 'https://picsum.photos/seed/doc2/100/100',
+    prescription : []
+  }
+];
 
 const PREVIOUS_APPOINTMENTS: Appointment[] = [
   {
@@ -12,28 +38,33 @@ const PREVIOUS_APPOINTMENTS: Appointment[] = [
     doctorName: 'Dr. Sarah Johnson',
     specialty: 'Cardiologist',
     hospital: 'Apollo Hospital',
-    date: 'Oct 24, 2024',
+    date: 'Dec 24, 2025',
     time: '10:30 AM',
     status: 'Completed',
-    image: 'https://picsum.photos/seed/doc1/100/100'
+    image: 'https://picsum.photos/seed/doc1/100/100',
+    prescription : []
   },
   {
     id: '2',
     doctorName: 'Dr. Aman Gupta',
     specialty: 'General Physician',
     hospital: 'Yashoda Hospital',
-    date: 'Sep 12, 2024',
+    date: 'Nov 12, 2025',
     time: '02:00 PM',
     status: 'Completed',
-    image: 'https://picsum.photos/seed/doc2/100/100'
+    image: 'https://picsum.photos/seed/doc2/100/100',
+    prescription : []
   }
 ];
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
   const [activeView, setActiveView] = useState<'profile' | 'appointments'>('profile');
+  const navigate = useNavigate();
 
   const menuItems = [
     { icon: 'calendar_today', label: 'My Appointments', color: 'text-blue-500', action: () => setActiveView('appointments') },
+    // In your ProfileScreen.tsx, find the menuItems array and add:
+    { icon: 'shopping_bag', label: 'Orders', color: 'text-red-500',  action: () => navigate('/orders')},
     { icon: 'people', label: 'Family Members', color: 'text-purple-500' },
     { icon: 'payment', label: 'Payment Methods', color: 'text-green-500' },
     { icon: 'help_outline', label: 'Help & Support', color: 'text-cyan-500' },
@@ -58,7 +89,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
              <button className="flex-1 bg-white dark:bg-gray-800 text-gray-500 py-3 rounded-2xl text-[10px] font-black uppercase tracking-widest border border-gray-100 dark:border-gray-700">Past</button>
           </div>
 
-          {PREVIOUS_APPOINTMENTS.map((app) => (
+          {UPCOMING_APPOINTMENTS.map((app) => (
             <div key={app.id} className="bg-white dark:bg-gray-800 rounded-3xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 flex gap-4">
               <img src={app.image} className="w-16 h-16 rounded-2xl object-cover" alt={app.doctorName} />
               <div className="flex-1">
@@ -85,6 +116,33 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
             </div>
           ))}
 
+          {PREVIOUS_APPOINTMENTS.map((app) => (
+              <div key={app.id} className="bg-white dark:bg-gray-800 rounded-3xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 flex gap-4">
+                <img src={app.image} className="w-16 h-16 rounded-2xl object-cover" alt={app.doctorName} />
+                <div className="flex-1">
+                  <div className="flex justify-between items-start">
+                    <div>
+                      <h4 className="font-bold text-sm text-gray-900 dark:text-white leading-none">{app.doctorName}</h4>
+                      <p className="text-[10px] text-primary font-black uppercase mt-1 tracking-tighter">{app.specialty}</p>
+                    </div>
+                    <span className="text-[8px] font-black uppercase bg-green-50 dark:bg-green-900/20 text-green-600 px-2 py-1 rounded-lg">{app.status}</span>
+                  </div>
+                  <div className="mt-3 flex items-center justify-between">
+                    <div className="flex items-center gap-3">
+                      <div className="flex items-center gap-1 text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                        <span className="material-icons-round text-xs">calendar_today</span>
+                        {app.date}
+                      </div>
+                      <div className="flex items-center gap-1 text-[9px] text-gray-400 font-bold uppercase tracking-widest">
+                        <span className="material-icons-round text-xs">schedule</span>
+                        {app.time}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+          ))}
+
           <div className="pt-10 text-center">
             <p className="text-[10px] text-gray-400 font-bold uppercase tracking-[0.2em]">End of List</p>
           </div>
@@ -109,8 +167,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
             />
             <div className="absolute -bottom-1 -right-1 w-8 h-8 bg-green-500 border-4 border-white dark:border-gray-800 rounded-full"></div>
           </div>
-          <h2 className="text-2xl font-black text-white tracking-tight">Alex Thompson</h2>
-          <p className="text-white/70 text-xs font-bold uppercase tracking-widest mt-1">Patient ID: #HN-2025-01</p>
+          <h2 className="text-2xl font-black text-white tracking-tight">Abhyuday Singh</h2>
+          <p className="text-white/70 text-xs font-bold uppercase tracking-widest mt-1">USER ID: #HN-2025-01</p>
           
           <div className="mt-8 flex gap-6 w-full justify-center">
             <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 flex flex-col items-center min-w-[80px]">
@@ -119,11 +177,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
             </div>
             <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 flex flex-col items-center min-w-[80px]">
               <span className="text-[10px] text-white/60 font-black uppercase mb-1">Height</span>
-              <span className="text-lg font-black text-white">182<span className="text-[10px]">cm</span></span>
+              <span className="text-lg font-black text-white">180<span className="text-[10px]">cm</span></span>
             </div>
             <div className="bg-white/10 backdrop-blur-md px-4 py-3 rounded-2xl border border-white/20 flex flex-col items-center min-w-[80px]">
               <span className="text-[10px] text-white/60 font-black uppercase mb-1">Weight</span>
-              <span className="text-lg font-black text-white">76<span className="text-[10px]">kg</span></span>
+              <span className="text-lg font-black text-white">82<span className="text-[10px]">kg</span></span>
             </div>
           </div>
         </div>

@@ -1,5 +1,6 @@
 
 import React from 'react';
+import hospitonetLogo from "@/src/asset/hospitonetLogo.jpeg";
 
 interface LoginScreenProps {
   onLogin: () => void;
@@ -19,13 +20,19 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin }) => {
           <div className="absolute inset-0 bg-white/20 rounded-[2rem] rotate-45 scale-75"></div>
           <div className="relative w-32 h-32 bg-white rounded-3xl flex items-center justify-center shadow-[0_0_50px_rgba(255,255,255,0.4)]">
              <div className="relative">
-                <span className="material-icons-round text-cyan-500 text-6xl">favorite</span>
-                <span className="material-icons-round absolute top-1 right-1 text-white bg-cyan-600 rounded-full text-lg border-2 border-white">add</span>
+                {/*<span className="material-icons-round text-cyan-500 text-6xl">favorite</span>*/}
+               <img
+                   className="material-icons-round text-cyan-500 text-6xl"
+                   alt="Hospitonet"
+                   src={hospitonetLogo}
+                   style={{maxWidth:'105%', borderRadius:'15px'}}
+               />
+                {/*<span className="material-icons-round absolute top-1 right-1 text-white bg-cyan-600 rounded-full text-lg border-2 border-white">add</span>*/}
              </div>
           </div>
         </div>
 
-        <h1 className="relative z-10 text-4xl font-black text-white tracking-tighter mb-1">HOSPITONET</h1>
+        {/*<h1 className="relative z-10 text-4xl font-black text-white tracking-tighter mb-1">HOSPITONET</h1>*/}
         <p className="relative z-10 text-cyan-100 font-bold tracking-[0.2em] text-[10px] uppercase">Empowering Hospitals, Enhancing Care</p>
       </div>
 

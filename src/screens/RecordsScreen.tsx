@@ -1,6 +1,7 @@
 
 import React from 'react';
-import { RecordItem } from '../types';
+import { useNavigate } from 'react-router-dom';
+import { RecordItem } from '../../types.ts';
 
 const RECORDS: RecordItem[] = [
   { id: '1', title: 'Complete Blood Count', location: 'KIMS Hospital, Kondapur', date: 'Today', status: 'Normal', type: 'lab' },
@@ -10,12 +11,18 @@ const RECORDS: RecordItem[] = [
 ];
 
 const RecordsScreen: React.FC = () => {
+  const navigate = useNavigate();
   return (
     <div className="flex flex-col pt-10">
       <header className="bg-primary text-white pt-10 pb-10 px-6 rounded-b-[3.5rem] shadow-xl relative z-40">
         <div className="flex justify-between items-center mb-8">
           <div className="flex items-center space-x-4">
-            <span className="material-icons-round text-white cursor-pointer p-2 bg-white/10 rounded-2xl backdrop-blur-md">arrow_back</span>
+            <span 
+  onClick={() => navigate(-1)}
+  className="material-icons-round text-white cursor-pointer p-2 bg-white/10 rounded-2xl backdrop-blur-md hover:bg-white/20 transition-colors"
+>
+  arrow_back
+</span>
             <h1 className="text-2xl font-black tracking-tight">Medical Records</h1>
           </div>
           <div className="relative">

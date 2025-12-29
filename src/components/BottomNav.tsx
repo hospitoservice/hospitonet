@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Screen } from '../types';
+import { Screen } from '../../types.ts';
 
 interface BottomNavProps {
   activeScreen: Screen;
