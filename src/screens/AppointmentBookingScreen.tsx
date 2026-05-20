@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { DEPARTMENTS, DOCTORS, TIME_SLOTS } from '../resources/AppointmentBooking';
 import { motion, AnimatePresence } from "framer-motion";
+import AppointmentService, { AppointmentInput } from '../service/AppointmentService';
 
 const AppointmentBookingScreen: React.FC = () => {
     const navigate = useNavigate();
@@ -24,6 +25,8 @@ const AppointmentBookingScreen: React.FC = () => {
     const [availableDoctors, setAvailableDoctors] = useState<typeof DOCTORS>({});
     const [availableTimeSlots, setAvailableTimeSlots] = useState<string[]>([]);
     const [showConfirmation, setShowConfirmation] = useState(false);
+    const [isSubmitting, setIsSubmitting] = useState(false);
+    const [error, setError] = useState<string | null>(null);
 
 
     useEffect(() => {
@@ -63,16 +66,66 @@ const AppointmentBookingScreen: React.FC = () => {
         });
     };
 
-    const handleSubmit = (e: React.FormEvent) => {
+    const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        // Handle form submission
-        console.log('Appointment booked:', { hospital, ...formData });
-        // Navigate to confirmation or home screen
-        setShowConfirmation(true);
-        // After 2 seconds, navigate to home
-        setTimeout(() => {
-            navigate('/');
-        }, 2000);
+        setIsSubmitting(true);
+        setError(null);
+
+        try {
+            // Split patient name into first and last name
+            const nameParts = formData.patientName.trim().split(' ');
+            const patientFirstName = nameParts[0] || '';
+            const patientLastName = nameParts.slice(1).join(' ') || '';
+
+            // Get doctor details
+            const selectedDoctor = formData.doctor ? DOCTORS[formData.doctor] : null;
+            const departmentName = DEPARTMENTS.find(dept => dept.id === formData.department)?.name || formData.department;
+
+            // Construct the appointment input
+            const appointmentInput: AppointmentInput = {
+                patientId: 'PATIENT_' + Date.now(), // Generate a temporary patient ID
+                patientFirstName,
+                patientLastName,
+                patientGender: 'Not Specified', // You may want to add a gender field to the form
+                patientMobile: formData.phoneNumber,
+                patientEmail: formData.email,
+                patientDOB: '1990-01-01', // You may want to add a DOB field to the form
+                department: departmentName,
+                doctor: selectedDoctor?.name,
+                doctorFees: selectedDoctor ? 500 : 0, // Default fee, you may want to make this configurable
+                appointmentDate: formData.date,
+                slot: formData.timeSlot,
+                status: 'Scheduled',
+                message: formData.notes || 'Appointment booking',
+                symptoms: formData.symptoms ? {
+                    symptomsPresent: true,
+                    otherSymptoms: formData.symptoms
+                } : undefined,
+                hospital: hospital ? {
+                    hospitalName: hospital.name,
+                    hospitalLocation: {
+                        city: hospital.location || 'Unknown'
+                    }
+                } : undefined
+            };
+
+            // Call the service to create appointment
+            const appointment = await AppointmentService.createAppointment(appointmentInput);
+            console.log('Appointment created successfully:', appointment);
+
+            // Show confirmation
+            setShowConfirmation(true);
+            
+            // After 2 seconds, navigate to home
+            setTimeout(() => {
+                navigate('/');
+            }, 2000);
+        } catch (err) {
+            console.error('Error creating appointment:', err);
+            setError('Failed to book appointment. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
     };
 
     return (
@@ -266,12 +319,20 @@ const AppointmentBookingScreen: React.FC = () => {
                         />
                     </div>
 
+                    {/* Error Display */}
+                    {error && (
+                        <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-xl p-4">
+                            <p className="text-red-600 dark:text-red-400 text-sm">{error}</p>
+                        </div>
+                    )}
+
                     {/* Submit Button */}
                     <button
                         type="submit"
-                        className="w-full mt-6 bg-primary hover:bg-primary-dark text-white font-medium py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all"
+                        disabled={isSubmitting}
+                        className="w-full mt-6 bg-primary hover:bg-primary-dark text-white font-medium py-3 px-6 rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
-                        Confirm Appointment
+                        {isSubmitting ? 'Booking Appointment...' : 'Confirm Appointment'}
                     </button>
                 </form>
             </div>

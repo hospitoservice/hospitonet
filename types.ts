@@ -1,6 +1,7 @@
 
 export enum Screen {
   LOGIN = 'login',
+  VERIFY = 'verify',
   HOME = 'home',
   HOSPITALS = 'hospitals',
   RECORDS = 'records',
@@ -9,7 +10,8 @@ export enum Screen {
   FAVOURITES = 'favourites',
   ASSISTANT = 'assistant',
   NOTIFICATIONS = 'notifications',
-  LABTESTS = 'lab-tests'
+  LABTESTS = 'lab-tests',
+  CHECKOUT = 'checkout'
 }
 
 export interface Doctor {

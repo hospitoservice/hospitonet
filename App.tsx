@@ -12,11 +12,13 @@ import HospitalsScreen from '@/src/screens/HospitalsScreen';
 import RecordsScreen from '@/src/screens/RecordsScreen';
 import AssistantScreen from '@/src/screens/AssistantScreen';
 import LoginScreen from '@/src/screens/LoginScreen';
+import VerifyScreen from '@/src/screens/VerifyScreen';
 import BottomNav from '@/src/components/BottomNav';
 import NotificationScreen from "@/src/screens/NotificationScreen.tsx";
 import OrderScreen from "@/src/screens/OrderScreen.tsx";
 import LabtestScreen from "@/src/screens/LabtestScreen.tsx";
 import AppointmentBookingScreen from "@/src/screens/AppointmentBookingScreen.tsx";
+import CheckoutScreen from '@/src/screens/CheckoutScreen';
 
 const AppContent: React.FC = () => {
   const [isDarkMode, setIsDarkMode] = useState(false);
@@ -33,7 +35,7 @@ const AppContent: React.FC = () => {
   };
 
   const currentScreen = getCurrentScreen();
-  const showNav = currentScreen !== Screen.LOGIN && currentScreen !== Screen.ASSISTANT;
+  const showNav = currentScreen !== Screen.LOGIN && currentScreen !== Screen.ASSISTANT && currentScreen !== Screen.VERIFY && currentScreen !== Screen.CHECKOUT;
 
   useEffect(() => {
     if (isDarkMode) {
@@ -65,10 +67,12 @@ const AppContent: React.FC = () => {
           <Route path="/hospitals" element={<HospitalsScreen />} />
           <Route path="/records" element={<RecordsScreen />} />
           <Route path="/assistant" element={<AssistantScreen onBack={() => handleNavigate(Screen.HOME)} />} />
-          <Route path="/login" element={<LoginScreen onLogin={() => handleNavigate(Screen.HOME)} />} />
+          <Route path="/login" element={<LoginScreen onNavigate={handleNavigate} />} />
+          <Route path="/verify" element={<VerifyScreen onNavigate={handleNavigate} />} />
           <Route path="/orders" element={<OrderScreen />} />
           <Route path="/lab-tests" element={<LabtestScreen />} />
           <Route path="/book-appointment" element={<AppointmentBookingScreen />} />
+          <Route path="/checkout" element={<CheckoutScreen />} />
           
           {/* 404 - Not Found */}
           <Route path="*" element={
