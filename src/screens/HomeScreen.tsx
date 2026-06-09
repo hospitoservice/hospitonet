@@ -1,6 +1,7 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Screen, Doctor } from '../../types.ts';
-import {LOCATIONS} from "@/src/resources/Location";
+import { LOCATIONS } from "@/src/resources/Location";
+import LocationService from '../service/LocationService';
 
 interface HomeScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -12,11 +13,17 @@ const TOP_SPECIALISTS: Doctor[] = [
   { id: '3', name: 'Dr. Emily Chen', specialty: 'Neurologist', hospital: 'Care Hospital', rating: 4.8, image: 'https://picsum.photos/seed/doc3/200/200' },
 ];
 
-const LOCATION = LOCATIONS;
-
 const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
-  const [selectedLocation, setSelectedLocation] = useState(LOCATION[0]);
+  const [locations, setLocations] = useState<string[]>(LOCATIONS);
+  const [selectedLocation, setSelectedLocation] = useState(LOCATIONS[0]);
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
+
+  useEffect(() => {
+    LocationService.getLocations().then(data => {
+      setLocations(data);
+      setSelectedLocation(data[0]);
+    });
+  }, []);
 
   return (
     <div className="flex flex-col bg-gray-50 dark:bg-gray-900 pt-10 pb-32 min-h-screen">
@@ -52,7 +59,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                     <div className="px-4 py-2 mb-1">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Select City</p>
                     </div>
-                    {LOCATION.map((loc) => (
+                    {locations.map((loc) => (
                       <button
                         key={loc}
                         onClick={() => {

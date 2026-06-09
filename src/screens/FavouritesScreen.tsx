@@ -1,9 +1,14 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { FAVOURITES } from '../resources/Favourites';
+import FavouritesService, { Favourites } from '../service/FavouritesService';
 
 const FavouritesScreen: React.FC = () => {
   const navigate = useNavigate();
+  const [favourites, setFavourites] = useState<Favourites>({ medicines: [], hospitals: [], doctors: [] });
+
+  useEffect(() => {
+    FavouritesService.getFavourites().then(setFavourites);
+  }, []);
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 pb-32">
@@ -21,11 +26,11 @@ const FavouritesScreen: React.FC = () => {
 
       <div className="p-6 space-y-6">
         {/* Medicines Section */}
-        {FAVOURITES.medicines.length > 0 && (
+        {favourites.medicines.length > 0 && (
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Medicines</h2>
             <div className="grid grid-cols-2 gap-4">
-              {FAVOURITES.medicines.map(medicine => (
+              {favourites.medicines.map(medicine => (
                 <div key={medicine.id} className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
                   <img 
                     src={medicine.image} 
@@ -47,11 +52,11 @@ const FavouritesScreen: React.FC = () => {
         )}
 
         {/* Hospitals Section */}
-        {FAVOURITES.hospitals.length > 0 && (
+        {favourites.hospitals.length > 0 && (
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Hospitals</h2>
             <div className="space-y-3">
-              {FAVOURITES.hospitals.map(hospital => (
+              {favourites.hospitals.map(hospital => (
                 <div key={hospital.id} className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 flex gap-3">
                   <img 
                     src={hospital.image} 
@@ -79,11 +84,11 @@ const FavouritesScreen: React.FC = () => {
         )}
 
         {/* Doctors Section */}
-        {FAVOURITES.doctors.length > 0 && (
+        {favourites.doctors.length > 0 && (
           <div>
             <h2 className="text-lg font-bold text-gray-900 dark:text-white mb-4">Doctors</h2>
             <div className="space-y-3">
-              {FAVOURITES.doctors.map(doctor => (
+              {favourites.doctors.map(doctor => (
                 <div key={doctor.id} className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700 flex gap-3">
                   <img 
                     src={doctor.image} 

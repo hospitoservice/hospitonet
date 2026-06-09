@@ -1,3 +1,5 @@
+import { BookedAppointment } from '../../types';
+
 // TypeScript interfaces matching the Java input classes
 
 export interface LocationInput {
@@ -12,7 +14,6 @@ export interface HospitalInput {
   hospitalName?: string;
   hospitalBranchId?: string;
   hospitalBranchName?: string;
-  hospitalContact?: string;
   hospitalLocation?: LocationInput;
 }
 
@@ -25,7 +26,6 @@ export interface PaymentInformationInput {
 
 export interface MedicineInput {
   id?: string;
-  medicinePresent?: boolean;
   medicineName?: string;
   medicineCategory?: string;
   medicineSupplier?: string;
@@ -42,7 +42,6 @@ export interface MedicineInput {
 
 export interface TestsAndReportsInput {
   id?: string;
-  testPresent?: boolean;
   testId?: string;
   testName?: string;
   testCategory?: string;
@@ -59,7 +58,6 @@ export interface TestsAndReportsInput {
 }
 
 export interface VitalsInput {
-  vitalPresent?: boolean;
   height?: string;
   weight?: string;
   bmi?: string;
@@ -72,7 +70,6 @@ export interface VitalsInput {
 }
 
 export interface SymptomsInput {
-  symptomsPresent?: boolean;
   fever?: boolean;
   cough?: boolean;
   headache?: boolean;
@@ -155,7 +152,7 @@ export interface Appointment {
 class AppointmentService {
   private readonly baseUrl: string;
 
-  constructor(baseUrl: string = 'http://localhost:8080/graphql') {
+  constructor(baseUrl: string = '/appointment/graphql') {
     this.baseUrl = baseUrl;
   }
 
@@ -188,7 +185,6 @@ class AppointmentService {
           message
           liveConsultant
           symptoms {
-            symptomsPresent
             fever
             cough
             headache
@@ -210,7 +206,6 @@ class AppointmentService {
             otherSymptoms
           }
           vitals {
-            vitalPresent
             height
             weight
             bmi
@@ -224,7 +219,6 @@ class AppointmentService {
           doctorComments
           testsAndReports {
             id
-            testPresent
             testId
             testName
             testCategory
@@ -241,7 +235,6 @@ class AppointmentService {
           }
           medicine {
             id
-            medicinePresent
             medicineName
             medicineCategory
             medicineSupplier
@@ -266,7 +259,6 @@ class AppointmentService {
             hospitalName
             hospitalBranchId
             hospitalBranchName
-            hospitalContact
             hospitalLocation {
               address
               city
@@ -308,6 +300,91 @@ class AppointmentService {
       throw error;
     }
   }
+
+  async getAppointmentsByPatientId(patientId: string): Promise<BookedAppointment[]> {
+    const query = `
+      query GetByPatientId($patientId: String!) {
+        getAppointmentsByPatientId(patientId: $patientId) {
+          id patientId patientFirstName patientLastName patientGender
+          patientMobile patientEmail patientDOB
+          department doctor doctorFees appointmentDate slot status message liveConsultant
+          vitals { height weight bmi temperature heartRate spo2 bloodGroup bloodPressure condition }
+          symptoms {
+            fever cough headache fatigue jointPain chestPain bodyPain abdominalPain
+            hairloss breathingProblem nightSweats infection vomiting diarrhea
+            constipation dizziness skinrash nausea otherSymptoms
+          }
+          doctorComments
+          medicine {
+            id medicineName medicineCategory medicineDosage medicineFrequency
+            medicineDuration store description price expiryDate
+          }
+          testsAndReports {
+            id testId testName testCategory testStatus
+            testAssignedDate testPerformedDate reportId reportName report reportDate
+          }
+          paymentInformation { paymentId paymentMode paymentAmount paymentSuccessful }
+          hospital {
+            hospitalId hospitalName hospitalBranchName
+            hospitalLocation { address city state pincode }
+          }
+        }
+      }
+    `;
+
+    const response = await fetch(this.baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables: { patientId } }),
+    });
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+    const result = await response.json();
+    if (result.errors) throw new Error(result.errors[0].message);
+    return result.data.getAppointmentsByPatientId ?? [];
+  }
+
+  async getAppointmentsByMobile(mobile: string): Promise<BookedAppointment[]> {
+    const query = `
+      query GetByMobile($mobile: String!) {
+        getAppointmentsByPatientMobile(mobile: $mobile) {
+          id patientId patientFirstName patientLastName patientGender
+          patientMobile patientEmail patientDOB
+          department doctor doctorFees appointmentDate slot status message liveConsultant
+          vitals { height weight bmi temperature heartRate spo2 bloodGroup bloodPressure condition }
+          symptoms {
+            fever cough headache fatigue jointPain chestPain bodyPain abdominalPain
+            hairloss breathingProblem nightSweats infection vomiting diarrhea
+            constipation dizziness skinrash nausea otherSymptoms
+          }
+          doctorComments
+          medicine {
+            id medicineName medicineCategory medicineDosage medicineFrequency
+            medicineDuration store description price expiryDate
+          }
+          testsAndReports {
+            id testId testName testCategory testStatus
+            testAssignedDate testPerformedDate reportId reportName report reportDate
+          }
+          paymentInformation { paymentId paymentMode paymentAmount paymentSuccessful }
+          hospital {
+            hospitalId hospitalName hospitalBranchName
+            hospitalLocation { address city state pincode }
+          }
+        }
+      }
+    `;
+
+    const response = await fetch(this.baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query, variables: { mobile } }),
+    });
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+    const result = await response.json();
+    if (result.errors) throw new Error(result.errors[0].message);
+    return result.data?.getAppointmentsByPatientMobile ?? [];
+  }
 }
 
 export default new AppointmentService();
+

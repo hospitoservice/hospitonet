@@ -1,4 +1,7 @@
 // src/resources/AppointmentBooking.ts
+
+// ── Static fallback types (legacy) ───────────────────────────────────────────
+
 export interface Doctor {
     id: string;
     name: string;
@@ -13,6 +16,35 @@ export interface Department {
     id: string;
     name: string;
     doctors: string[]; // Array of doctor IDs
+}
+
+// ── Live API types (from employee-service) ────────────────────────────────────
+
+/** Department returned by GET /api/employees/hospital/{id}/departments */
+export interface HospitalDepartment {
+    id: string;
+    name: string;
+}
+
+/** Doctor card returned by GET /api/employees/hospital/{id}/department/{id}/doctors */
+export interface EmployeeDoctor {
+    employeeId: string;
+    fullName: string;
+    designation: string;
+    department: string;
+    departmentId: string;
+    profileImageUrl?: string;
+}
+
+/** Time slot returned by GET /api/employees/{staffId}/available-slots */
+export interface AvailableSlot {
+    slotId: string;
+    startTime: string;   // "HH:mm" 24-hour format
+    endTime: string;     // "HH:mm" 24-hour format
+    status: string;      // "AVAILABLE" | "BOOKED" | "BLOCKED"
+    employeeId: string;
+    patientId?: string;
+    appointmentId?: string;
 }
 
 export const DEPARTMENTS: Department[] = [

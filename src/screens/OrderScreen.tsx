@@ -1,10 +1,16 @@
 // src/screens/OrderScreen.tsx
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { ORDERS } from '../resources/Order';
+import { Order } from '../resources/Order';
+import OrderService from '../service/OrderService';
 
 const OrderScreen: React.FC = () => {
     const navigate = useNavigate();
+    const [orders, setOrders] = useState<Order[]>([]);
+
+    useEffect(() => {
+        OrderService.getOrders().then(setOrders);
+    }, []);
 
     const getStatusColor = (status: string) => {
         switch (status) {
@@ -39,7 +45,7 @@ const OrderScreen: React.FC = () => {
             </header>
 
             <div className="px-6 mt-4 space-y-4">
-                {ORDERS.map((order) => (
+                {orders.map((order) => (
                     <div
                         key={order.id}
                         className="bg-white dark:bg-gray-800 rounded-2xl p-4 shadow-sm border border-gray-100 dark:border-gray-700"

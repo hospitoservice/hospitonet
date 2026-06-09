@@ -1,10 +1,14 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import NOTIFICATIONS from '../resources/notifications';
+import NotificationService, { Notification } from '../service/NotificationService';
 
 const NotificationScreen: React.FC = () => {
   const navigate = useNavigate();
-  const [notifications, setNotifications] = useState(NOTIFICATIONS);
+  const [notifications, setNotifications] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    NotificationService.getNotifications().then(setNotifications);
+  }, []);
 
   const markAsRead = (id: string) => {
     setNotifications(prev => 

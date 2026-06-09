@@ -4,14 +4,19 @@ import { Medicine, Appointment } from '../../types.ts';
 import PrescriptionHub from '@/src/components/PrescriptionHub.tsx';
 import { Medicines } from '@/src/resources/Medicines';
 import { MEDICINES_CONFIG } from '@/src/resources/MedicinesScreenConfig.js';
+import MedicineService from '../service/MedicineService';
 import CartScreen, { CartItem } from '@/src/screens/CartScreen';
 
-const MEDICINES = Medicines;
 const C = MEDICINES_CONFIG;
 
 const MedicinesScreen: React.FC = () => {
   const navigate = useNavigate();
+  const [medicines, setMedicines] = useState<Medicine[]>(Medicines as Medicine[]);
   const [cart, setCart] = useState<CartItem[]>([]);
+
+  useEffect(() => {
+    MedicineService.getMedicines().then(setMedicines);
+  }, []);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [showPrescriptionHub, setShowPrescriptionHub] = useState(false);
 
@@ -172,7 +177,7 @@ const MedicinesScreen: React.FC = () => {
 
         {/* Medicine Grid */}
         <div className="grid grid-cols-2 gap-3">
-          {MEDICINES.map((med) => {
+          {medicines.map((med) => {
             const inCart = cart.find(i => i.id === med.id);
             const isFav = favourites.has(med.id);
             const discountPct = med.originalPrice

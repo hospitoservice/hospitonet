@@ -1,4 +1,9 @@
 // src/resources/Labtest.ts
+export interface TestCategory {
+    id: string;
+    name: string;
+}
+
 export interface LabTest {
     id: string;
     name: string;
