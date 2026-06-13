@@ -139,22 +139,37 @@ export async function createPatient(
  * or creates one if none exists.
  *
  * Lookup order:
- *   1. userId + hospitalId  (most reliable — user already registered at this hospital)
- *   2. mobile + hospitalId  (phone-based fallback within the same hospital)
- *   3. Create new patient record at this hospital using the user's profile
+ *   1. userId + hospitalId  (exact hospital-scoped match)
+ *   2. mobile + hospitalId  (phone-based hospital-scoped match)
+ *   3. userId globally      (reuse existing record when hospitalId format changed — prevents duplicate patients)
+ *   4. mobile globally      (last-resort reuse before creating a brand-new patient)
+ *   5. Create new patient   (truly first-time patient with no prior record anywhere)
  */
 export async function ensurePatientForHospital(
   user: UserProfile,
   hospitalId: string
 ): Promise<PatientRecord> {
+  // Hospital-scoped lookups (exact match)
   if (user.id) {
     const byUserAndHospital = await findPatientByUserIdAndHospital(user.id, hospitalId).catch(() => null);
     if (byUserAndHospital) return byUserAndHospital;
   }
-
   if (user.phone) {
     const byMobileAndHospital = await findPatientByMobileAndHospital(user.phone, hospitalId).catch(() => null);
     if (byMobileAndHospital) return byMobileAndHospital;
+  }
+
+  // Global fallback — reuse any existing patient record for this user.
+  // This preserves patientId continuity when a prior booking used a different
+  // hospitalId format (e.g. MongoDB hash vs "H00012"), which would otherwise
+  // create a duplicate patient and orphan all prior appointments.
+  if (user.id) {
+    const byUserId = await findPatientByUserId(user.id).catch(() => null);
+    if (byUserId) return byUserId;
+  }
+  if (user.phone) {
+    const byMobile = await findPatientByMobile(user.phone).catch(() => null);
+    if (byMobile) return byMobile;
   }
 
   return createPatient(user, hospitalId);

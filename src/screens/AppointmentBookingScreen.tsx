@@ -38,7 +38,7 @@ const InlineLoader: React.FC<{ label: string }> = ({ label }) => (
 const AppointmentBookingScreen: React.FC = () => {
     const navigate  = useNavigate();
     const location  = useLocation();
-    const { hospital } = (location.state || {}) as { hospital?: { id: string; name: string; location?: string } };
+    const { hospital } = (location.state || {}) as { hospital?: { id: string; hospitalId?: string; name: string; location?: string } };
 
     // ── Form data ──────────────────────────────────────────────────────────────
     const [formData, setFormData] = useState({
@@ -193,17 +193,25 @@ const AppointmentBookingScreen: React.FC = () => {
                 gender:      formData.gender,
             };
 
-            // Resolve or create a hospital-scoped Patient record.
-            // If the user already has a record at this hospital it is reused;
-            // otherwise a new one is created using the user's profile details.
-            const patientRecord = await ensurePatientForHospital(userForPatient, hospital?.id ?? '');
-            const patientId     = patientRecord.patientId;
+            // Resolve or create a patient record.  Use the formatted hospitalId ("H00012")
+            // so the lookup key is stable; the global fallback inside ensurePatientForHospital
+            // handles users whose prior record was created with a different format.
+            const patientRecord = await ensurePatientForHospital(
+                userForPatient,
+                hospital?.hospitalId ?? hospital?.id ?? '',
+            );
+            const patientId = patientRecord.patientId;
 
-            // Always keep user.patientId pointing to the most recently used patient record
+            // Keep user.patientId pointing to the resolved patient record.
+            // Awaited so the link is committed before we show the confirmation,
+            // ensuring RecordsScreen can find appointments on the next visit.
             if (currentUser?.id && patientRecord.patientId) {
-                UserService.linkPatient(currentUser.id, patientRecord.patientId)
-                    .then(updated => setCurrentUser(updated))
-                    .catch(err => console.warn('Failed to link patient to user:', err));
+                try {
+                    const updated = await UserService.linkPatient(currentUser.id, patientRecord.patientId);
+                    setCurrentUser(updated);
+                } catch (err) {
+                    console.warn('Failed to link patient to user:', err);
+                }
             }
 
             const appointmentInput: AppointmentInput = {
@@ -224,7 +232,7 @@ const AppointmentBookingScreen: React.FC = () => {
                 message:         formData.notes || 'Appointment booking',
                 symptoms:        formData.symptoms ? { otherSymptoms: formData.symptoms } : undefined,
                 hospital:        hospital
-                    ? { hospitalName: hospital.name, hospitalLocation: { city: hospital.location ?? '' } }
+                    ? { hospitalId: hospital.hospitalId ?? hospital.id, hospitalName: hospital.name, hospitalLocation: { city: hospital.location ?? '' } }
                     : undefined,
             };
 

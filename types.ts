@@ -25,6 +25,7 @@ export interface Doctor {
 
 export interface Hospital {
   id: string;
+  hospitalId?: string;
   name: string;
   location: string;
   city?: string;

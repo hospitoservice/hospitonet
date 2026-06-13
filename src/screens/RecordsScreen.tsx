@@ -86,11 +86,26 @@ const RecordsScreen: React.FC = () => {
         if (!phone) { setPatientIdMissing(true); setLoading(false); return; }
 
         const user = await UserService.getUserByPhone(phone);
-        if (!user?.patientId) { setPatientIdMissing(true); setLoading(false); return; }
+        if (!user) { setPatientIdMissing(true); setLoading(false); return; }
 
-        const data = await AppointmentService.getAppointmentsByPatientId(user.patientId);
-        data.sort((a, b) => (b.appointmentDate ?? '').localeCompare(a.appointmentDate ?? ''));
-        setAppointments(data);
+        // Query by both patientId and mobile in parallel, then deduplicate by appointment id.
+        // The mobile query acts as a safety net: if user.patientId is null (linkPatient never
+        // ran or failed), or if it points to a newer patient record while old appointments
+        // live under a prior patientId, the mobile query still surfaces them all.
+        const [byId, byMobile] = await Promise.all([
+          user.patientId
+            ? AppointmentService.getAppointmentsByPatientId(user.patientId).catch(() => [] as BookedAppointment[])
+            : Promise.resolve([] as BookedAppointment[]),
+          AppointmentService.getAppointmentsByMobile(phone).catch(() => [] as BookedAppointment[]),
+        ]);
+
+        const seen = new Set<string>();
+        const merged: BookedAppointment[] = [];
+        for (const appt of [...byId, ...byMobile]) {
+          if (!seen.has(appt.id)) { seen.add(appt.id); merged.push(appt); }
+        }
+        merged.sort((a, b) => (b.appointmentDate ?? '').localeCompare(a.appointmentDate ?? ''));
+        setAppointments(merged);
       } catch {
         setError('Failed to load records. Please try again.');
       } finally {
