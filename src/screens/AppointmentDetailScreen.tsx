@@ -7,6 +7,7 @@ import {
   AppointmentMedicine,
   AppointmentTestReport,
 } from '../../types';
+import AppointmentService from '../service/AppointmentService';
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
@@ -337,12 +338,78 @@ interface LocationState {
   initialTab?: TabName;
 }
 
+// ── Confirm Dialog ────────────────────────────────────────────────────────────
+
+interface ConfirmDialogProps {
+  type: 'cancel' | 'delete';
+  loading: boolean;
+  error: string | null;
+  onConfirm: () => void;
+  onDismiss: () => void;
+}
+
+const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ type, loading, error, onConfirm, onDismiss }) => {
+  const isCancel = type === 'cancel';
+  return (
+    <div className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm px-4 pb-6">
+      <div className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-2xl">
+        <div className={`w-14 h-14 rounded-2xl flex items-center justify-center mx-auto mb-4 ${isCancel ? 'bg-amber-50 dark:bg-amber-900/20' : 'bg-red-50 dark:bg-red-900/20'}`}>
+          <span className={`material-icons-round text-3xl ${isCancel ? 'text-amber-500' : 'text-red-500'}`}>
+            {isCancel ? 'cancel' : 'delete_forever'}
+          </span>
+        </div>
+        <h2 className="text-base font-black text-gray-900 dark:text-white text-center mb-1">
+          {isCancel ? 'Cancel Appointment?' : 'Delete Appointment?'}
+        </h2>
+        <p className="text-xs text-gray-500 dark:text-gray-400 text-center leading-relaxed mb-5">
+          {isCancel
+            ? 'This appointment will be marked as Cancelled. This action cannot be undone.'
+            : 'This appointment record will be permanently removed. This action cannot be undone.'}
+        </p>
+        {error && (
+          <p className="text-xs text-red-500 font-bold text-center mb-3">{error}</p>
+        )}
+        <div className="flex gap-3">
+          <button
+            onClick={onDismiss}
+            disabled={loading}
+            className="flex-1 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 text-sm font-black text-gray-600 dark:text-gray-300 disabled:opacity-50"
+          >
+            Keep
+          </button>
+          <button
+            onClick={onConfirm}
+            disabled={loading}
+            className={`flex-1 py-3 rounded-2xl text-sm font-black text-white disabled:opacity-60 flex items-center justify-center gap-2 ${
+              isCancel ? 'bg-amber-500' : 'bg-red-500'
+            }`}
+          >
+            {loading ? (
+              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+            ) : (
+              <>
+                <span className="material-icons-round text-base">{isCancel ? 'cancel' : 'delete'}</span>
+                {isCancel ? 'Yes, Cancel' : 'Yes, Delete'}
+              </>
+            )}
+          </button>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+// ── Main screen ───────────────────────────────────────────────────────────────
+
 const AppointmentDetailScreen: React.FC = () => {
   const navigate = useNavigate();
   const { state } = useLocation() as { state: LocationState | null };
   const appt = state?.appointment;
 
   const [activeTab, setActiveTab] = useState<TabName>(state?.initialTab ?? 'Overview');
+  const [confirmAction, setConfirmAction] = useState<'cancel' | 'delete' | null>(null);
+  const [actionLoading, setActionLoading] = useState(false);
+  const [actionError, setActionError] = useState<string | null>(null);
 
   if (!appt) {
     return (
@@ -356,8 +423,35 @@ const AppointmentDetailScreen: React.FC = () => {
     );
   }
 
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const apptDate = new Date(appt.appointmentDate + 'T00:00:00');
+  const isPast = apptDate < today;
+
+  const canCancel = appt.status === 'Scheduled' && !isPast;
+  const canDelete = isPast || appt.status === 'Completed' || appt.status === 'Cancelled';
+
   const isScheduled = appt.status === 'Scheduled';
   const statusStyle = STATUS_STYLE[appt.status] ?? STATUS_STYLE.Scheduled;
+
+  const handleConfirm = async () => {
+    if (!confirmAction) return;
+    setActionLoading(true);
+    setActionError(null);
+    try {
+      if (confirmAction === 'cancel') {
+        await AppointmentService.cancelAppointment(appt.id, appt);
+      } else {
+        await AppointmentService.deleteAppointment(appt.id);
+      }
+      navigate(-1);
+    } catch (err) {
+      setActionError(err instanceof Error ? err.message : 'Something went wrong. Please try again.');
+      setActionLoading(false);
+    }
+  };
+
+  const hasPaddingForFooter = canCancel || canDelete;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
@@ -421,7 +515,7 @@ const AppointmentDetailScreen: React.FC = () => {
       </div>
 
       {/* Tab content */}
-      <div className="flex-1 overflow-y-auto px-4 pb-10 pt-4">
+      <div className={`flex-1 overflow-y-auto px-4 pt-4 ${hasPaddingForFooter ? 'pb-28' : 'pb-10'}`}>
         {activeTab === 'Overview'     && <OverviewTab     appt={appt} />}
         {activeTab === 'Vitals'       && <VitalsTab       vitals={appt.vitals}      isScheduled={isScheduled} />}
         {activeTab === 'Symptoms'     && <SymptomsTab     symptoms={appt.symptoms}  isScheduled={isScheduled} />}
@@ -429,6 +523,41 @@ const AppointmentDetailScreen: React.FC = () => {
         {activeTab === 'Medicines'    && <MedicinesTab    medicine={appt.medicine}  isScheduled={isScheduled} />}
         {activeTab === 'Reports'      && <ReportsTab      tests={appt.testsAndReports} isScheduled={isScheduled} />}
       </div>
+
+      {/* Action footer */}
+      {hasPaddingForFooter && (
+        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-4 py-4 safe-area-inset-bottom shadow-lg">
+          {canCancel && (
+            <button
+              onClick={() => { setActionError(null); setConfirmAction('cancel'); }}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 text-sm font-black active:scale-[0.98] transition-transform"
+            >
+              <span className="material-icons-round text-xl">cancel</span>
+              Cancel Appointment
+            </button>
+          )}
+          {canDelete && (
+            <button
+              onClick={() => { setActionError(null); setConfirmAction('delete'); }}
+              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 text-sm font-black active:scale-[0.98] transition-transform"
+            >
+              <span className="material-icons-round text-xl">delete_forever</span>
+              Delete Appointment
+            </button>
+          )}
+        </div>
+      )}
+
+      {/* Confirmation dialog */}
+      {confirmAction && (
+        <ConfirmDialog
+          type={confirmAction}
+          loading={actionLoading}
+          error={actionError}
+          onConfirm={handleConfirm}
+          onDismiss={() => { setConfirmAction(null); setActionError(null); }}
+        />
+      )}
     </div>
   );
 };

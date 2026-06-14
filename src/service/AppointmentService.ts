@@ -1,4 +1,4 @@
-import { BookedAppointment } from '../../types';
+import { BookedAppointment, AppointmentHospitalInfo } from '../../types';
 
 // TypeScript interfaces matching the Java input classes
 
@@ -147,6 +147,37 @@ export interface Appointment {
   medicine?: MedicineInput[];
   paymentInformation?: PaymentInformationInput[];
   hospital?: HospitalInput;
+}
+
+function bookingToInput(
+  appt: BookedAppointment,
+  overrides: Partial<AppointmentInput> = {},
+): AppointmentInput {
+  const hosp = appt.hospital as (AppointmentHospitalInfo & { hospitalBranchId?: string }) | undefined;
+  return {
+    patientId: appt.patientId,
+    patientFirstName: appt.patientFirstName,
+    patientLastName: appt.patientLastName,
+    patientGender: appt.patientGender ?? '',
+    patientMobile: appt.patientMobile ?? '',
+    patientEmail: appt.patientEmail,
+    patientDOB: appt.patientDOB ?? '',
+    department: appt.department,
+    doctor: appt.doctor,
+    doctorFees: appt.doctorFees,
+    shift: appt.shift,
+    appointmentDate: appt.appointmentDate,
+    slot: appt.slot,
+    appointmentPriority: appt.appointmentPriority,
+    paymentMode: appt.paymentMode,
+    status: appt.status,
+    message: appt.message ?? '',
+    liveConsultant: appt.liveConsultant ?? '',
+    hospital: hosp
+      ? { hospitalId: hosp.hospitalId, hospitalName: hosp.hospitalName, hospitalBranchId: hosp.hospitalBranchId, hospitalBranchName: hosp.hospitalBranchName, hospitalLocation: hosp.hospitalLocation }
+      : undefined,
+    ...overrides,
+  };
 }
 
 class AppointmentService {
@@ -341,6 +372,51 @@ class AppointmentService {
     const result = await response.json();
     if (result.errors) throw new Error(result.errors[0].message);
     return result.data.getAppointmentsByPatientId ?? [];
+  }
+
+  async updateAppointment(id: string, input: AppointmentInput): Promise<Appointment> {
+    const mutation = `
+      mutation UpdateAppointment($id: ID!, $input: AppointmentInput!) {
+        updateAppointment(id: $id, input: $input) {
+          id patientId patientFirstName patientLastName patientGender patientMobile
+          patientEmail patientDOB department doctor doctorFees shift
+          appointmentDate slot appointmentPriority paymentMode status message liveConsultant
+          doctorComments
+          hospital { hospitalId hospitalName hospitalBranchId hospitalBranchName hospitalLocation { address city state pincode } }
+        }
+      }
+    `;
+    const response = await fetch(this.baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: mutation, variables: { id, input } }),
+    });
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+    const result = await response.json();
+    if (result.errors) throw new Error(result.errors[0].message);
+    return result.data.updateAppointment;
+  }
+
+  async cancelAppointment(id: string, appt: BookedAppointment): Promise<Appointment> {
+    const input = bookingToInput(appt, { status: 'Cancelled' });
+    return this.updateAppointment(id, input);
+  }
+
+  async deleteAppointment(id: string): Promise<boolean> {
+    const mutation = `
+      mutation DeleteAppointment($id: ID!) {
+        deleteAppointment(id: $id)
+      }
+    `;
+    const response = await fetch(this.baseUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query: mutation, variables: { id } }),
+    });
+    if (!response.ok) throw new Error(`HTTP error: ${response.status}`);
+    const result = await response.json();
+    if (result.errors) throw new Error(result.errors[0].message);
+    return result.data.deleteAppointment as boolean;
   }
 
   async getAppointmentsByMobile(mobile: string): Promise<BookedAppointment[]> {
