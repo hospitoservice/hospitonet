@@ -141,9 +141,11 @@ export async function createPatient(
  * Lookup order:
  *   1. userId + hospitalId  (exact hospital-scoped match)
  *   2. mobile + hospitalId  (phone-based hospital-scoped match)
- *   3. userId globally      (reuse existing record when hospitalId format changed — prevents duplicate patients)
- *   4. mobile globally      (last-resort reuse before creating a brand-new patient)
- *   5. Create new patient   (truly first-time patient with no prior record anywhere)
+ *   3. userId globally      (reuse only if that record has no hospitalId of its own —
+ *                            i.e. it predates hospital scoping — prevents duplicate patients
+ *                            without stealing a patient record from a different hospital)
+ *   4. mobile globally      (same guard, last resort before creating a brand-new patient)
+ *   5. Create new patient   (first-time patient here, or already registered elsewhere)
  */
 export async function ensurePatientForHospital(
   user: UserProfile,
@@ -159,17 +161,21 @@ export async function ensurePatientForHospital(
     if (byMobileAndHospital) return byMobileAndHospital;
   }
 
-  // Global fallback — reuse any existing patient record for this user.
-  // This preserves patientId continuity when a prior booking used a different
-  // hospitalId format (e.g. MongoDB hash vs "H00012"), which would otherwise
-  // create a duplicate patient and orphan all prior appointments.
+  // Global fallback — reuse an existing patient record for this user only if
+  // it isn't already scoped to a *different* hospital. A record with no
+  // hospitalId predates hospital scoping and is safe to adopt here. But a
+  // record that already belongs to another hospital must not be silently
+  // reused: doing so would create the appointment here while leaving the
+  // patient invisible in this hospital's patient list (their record's
+  // hospitalId still points elsewhere) — treat this hospital as a genuinely
+  // new registration instead.
   if (user.id) {
     const byUserId = await findPatientByUserId(user.id).catch(() => null);
-    if (byUserId) return byUserId;
+    if (byUserId && !byUserId.hospitalId) return byUserId;
   }
   if (user.phone) {
     const byMobile = await findPatientByMobile(user.phone).catch(() => null);
-    if (byMobile) return byMobile;
+    if (byMobile && !byMobile.hospitalId) return byMobile;
   }
 
   return createPatient(user, hospitalId);

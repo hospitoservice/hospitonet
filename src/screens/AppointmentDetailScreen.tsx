@@ -1,5 +1,5 @@
-import React, { useState } from 'react';
-import { useNavigate, useLocation } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { useNavigate, useLocation, useParams } from 'react-router-dom';
 import {
   BookedAppointment,
   AppointmentVitals,
@@ -29,6 +29,7 @@ function formatTime(slot?: string): string {
 
 const STATUS_STYLE: Record<string, { pill: string; dot: string; label: string }> = {
   Scheduled:    { pill: 'bg-blue-50 text-blue-600 border border-blue-100',   dot: 'bg-blue-500',   label: 'Scheduled' },
+  Confirmed:    { pill: 'bg-blue-50 text-blue-600 border border-blue-100',   dot: 'bg-blue-500',   label: 'Confirmed' },
   'In Progress':{ pill: 'bg-amber-50 text-amber-600 border border-amber-100',dot: 'bg-amber-500',  label: 'In Progress' },
   Completed:    { pill: 'bg-green-50 text-green-600 border border-green-100',dot: 'bg-green-500',  label: 'Completed' },
   Cancelled:    { pill: 'bg-red-50 text-red-600 border border-red-100',      dot: 'bg-red-500',    label: 'Cancelled' },
@@ -109,10 +110,12 @@ const OverviewTab: React.FC<{ appt: BookedAppointment }> = ({ appt }) => {
 };
 
 const VitalsTab: React.FC<{ vitals?: AppointmentVitals; isScheduled: boolean }> = ({ vitals, isScheduled }) => {
-  if (isScheduled) return <AwaitingVisit message="Vitals will be recorded when you arrive at the hospital." />;
-
   const hasData = vitals && Object.values(vitals).some(v => v && v !== false);
-  if (!hasData) return <EmptyState icon="monitor_heart" label="No vitals recorded" />;
+  if (!hasData) {
+    return isScheduled
+      ? <AwaitingVisit message="Vitals will be recorded when you arrive at the hospital." />
+      : <EmptyState icon="monitor_heart" label="No vitals recorded" />;
+  }
 
   const metrics = [
     { icon: 'thermostat',      label: 'Temp',         value: vitals?.temperature,  unit: '°F',  color: 'bg-red-50 text-red-500' },
@@ -153,8 +156,6 @@ const VitalsTab: React.FC<{ vitals?: AppointmentVitals; isScheduled: boolean }> 
 };
 
 const SymptomsTab: React.FC<{ symptoms?: AppointmentSymptoms; isScheduled: boolean }> = ({ symptoms, isScheduled }) => {
-  if (isScheduled) return <AwaitingVisit message="Symptoms will be recorded by the nurse on arrival." />;
-
   const SYMPTOM_LABELS: Record<keyof AppointmentSymptoms, string> = {
     fever: 'Fever', cough: 'Cough', headache: 'Headache', fatigue: 'Fatigue',
     jointPain: 'Joint Pain', chestPain: 'Chest Pain', bodyPain: 'Body Pain',
@@ -171,7 +172,11 @@ const SymptomsTab: React.FC<{ symptoms?: AppointmentSymptoms; isScheduled: boole
     : [];
 
   const hasData = active.length > 0 || symptoms?.otherSymptoms;
-  if (!hasData) return <EmptyState icon="sick" label="No symptoms recorded" />;
+  if (!hasData) {
+    return isScheduled
+      ? <AwaitingVisit message="Symptoms will be recorded by the nurse on arrival." />
+      : <EmptyState icon="sick" label="No symptoms recorded" />;
+  }
 
   return (
     <div className="py-2 space-y-4">
@@ -198,8 +203,11 @@ const SymptomsTab: React.FC<{ symptoms?: AppointmentSymptoms; isScheduled: boole
 };
 
 const ConsultationTab: React.FC<{ comments?: string; isScheduled: boolean }> = ({ comments, isScheduled }) => {
-  if (isScheduled) return <AwaitingVisit message="Doctor's notes will appear here after your consultation." />;
-  if (!comments?.trim()) return <EmptyState icon="sticky_note_2" label="No consultation notes yet" />;
+  if (!comments?.trim()) {
+    return isScheduled
+      ? <AwaitingVisit message="Doctor's notes will appear here after your consultation." />
+      : <EmptyState icon="sticky_note_2" label="No consultation notes yet" />;
+  }
   return (
     <div className="py-2">
       <div className="bg-white dark:bg-gray-800 rounded-2xl p-5 shadow-sm border border-gray-100 dark:border-gray-700">
@@ -214,8 +222,11 @@ const ConsultationTab: React.FC<{ comments?: string; isScheduled: boolean }> = (
 };
 
 const MedicinesTab: React.FC<{ medicine?: AppointmentMedicine[]; isScheduled: boolean }> = ({ medicine, isScheduled }) => {
-  if (isScheduled) return <AwaitingVisit message="Prescriptions will be issued after your consultation." />;
-  if (!medicine?.length) return <EmptyState icon="medication" label="No prescription issued" />;
+  if (!medicine?.length) {
+    return isScheduled
+      ? <AwaitingVisit message="Prescriptions will be issued after your consultation." />
+      : <EmptyState icon="medication" label="No prescription issued" />;
+  }
   return (
     <div className="py-2 space-y-3">
       {medicine.map((med, i) => (
@@ -264,8 +275,11 @@ const TEST_STATUS_STYLE: Record<string, string> = {
 };
 
 const ReportsTab: React.FC<{ tests?: AppointmentTestReport[]; isScheduled: boolean }> = ({ tests, isScheduled }) => {
-  if (isScheduled) return <AwaitingVisit message="Lab tests will be assigned after your consultation." />;
-  if (!tests?.length) return <EmptyState icon="science" label="No tests assigned" />;
+  if (!tests?.length) {
+    return isScheduled
+      ? <AwaitingVisit message="Lab tests will be assigned after your consultation." />
+      : <EmptyState icon="science" label="No tests assigned" />;
+  }
   return (
     <div className="py-2 space-y-3">
       {tests.map((test, i) => {
@@ -404,12 +418,23 @@ const ConfirmDialog: React.FC<ConfirmDialogProps> = ({ type, loading, error, onC
 const AppointmentDetailScreen: React.FC = () => {
   const navigate = useNavigate();
   const { state } = useLocation() as { state: LocationState | null };
-  const appt = state?.appointment;
+  const { id } = useParams<{ id: string }>();
 
+  // Seed with navigation-state snapshot so the screen is never blank while fetching.
+  const [appt, setAppt] = useState<BookedAppointment | null>(state?.appointment ?? null);
   const [activeTab, setActiveTab] = useState<TabName>(state?.initialTab ?? 'Overview');
   const [confirmAction, setConfirmAction] = useState<'cancel' | 'delete' | null>(null);
   const [actionLoading, setActionLoading] = useState(false);
   const [actionError, setActionError] = useState<string | null>(null);
+
+  // Always re-fetch from the server so doctor-updated fields (vitals, medicines,
+  // consultation notes, test reports) are current, not a stale navigation snapshot.
+  useEffect(() => {
+    if (!id) return;
+    AppointmentService.getAppointmentById(id)
+      .then(fresh => setAppt(fresh))
+      .catch(err => console.error('[AppointmentDetail] re-fetch failed:', err));
+  }, [id]);
 
   if (!appt) {
     return (
@@ -428,11 +453,24 @@ const AppointmentDetailScreen: React.FC = () => {
   const apptDate = new Date(appt.appointmentDate + 'T00:00:00');
   const isPast = apptDate < today;
 
-  const canCancel = appt.status === 'Scheduled' && !isPast;
+  const isUpcomingStatus = appt.status === 'Scheduled' || appt.status === 'Confirmed';
+
+  const canCancel = isUpcomingStatus && !isPast;
   const canDelete = isPast || appt.status === 'Completed' || appt.status === 'Cancelled';
 
-  const isScheduled = appt.status === 'Scheduled';
+  const isScheduled = isUpcomingStatus;
   const statusStyle = STATUS_STYLE[appt.status] ?? STATUS_STYLE.Scheduled;
+
+  const handleRaiseComplaint = () => {
+    navigate('/raise-complaint', {
+      state: {
+        appointmentId: appt.id,
+        patientId: appt.patientId,
+        hospitalId: appt.hospital?.hospitalId,
+        doctor: appt.doctor,
+      },
+    });
+  };
 
   const handleConfirm = async () => {
     if (!confirmAction) return;
@@ -450,8 +488,6 @@ const AppointmentDetailScreen: React.FC = () => {
       setActionLoading(false);
     }
   };
-
-  const hasPaddingForFooter = canCancel || canDelete;
 
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900 flex flex-col">
@@ -515,7 +551,7 @@ const AppointmentDetailScreen: React.FC = () => {
       </div>
 
       {/* Tab content */}
-      <div className={`flex-1 overflow-y-auto px-4 pt-4 ${hasPaddingForFooter ? 'pb-28' : 'pb-10'}`}>
+      <div className="flex-1 overflow-y-auto px-4 pt-4 pb-28">
         {activeTab === 'Overview'     && <OverviewTab     appt={appt} />}
         {activeTab === 'Vitals'       && <VitalsTab       vitals={appt.vitals}      isScheduled={isScheduled} />}
         {activeTab === 'Symptoms'     && <SymptomsTab     symptoms={appt.symptoms}  isScheduled={isScheduled} />}
@@ -525,28 +561,33 @@ const AppointmentDetailScreen: React.FC = () => {
       </div>
 
       {/* Action footer */}
-      {hasPaddingForFooter && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-4 py-4 safe-area-inset-bottom shadow-lg">
-          {canCancel && (
-            <button
-              onClick={() => { setActionError(null); setConfirmAction('cancel'); }}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 text-sm font-black active:scale-[0.98] transition-transform"
-            >
-              <span className="material-icons-round text-xl">cancel</span>
-              Cancel Appointment
-            </button>
-          )}
-          {canDelete && (
-            <button
-              onClick={() => { setActionError(null); setConfirmAction('delete'); }}
-              className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 text-sm font-black active:scale-[0.98] transition-transform"
-            >
-              <span className="material-icons-round text-xl">delete_forever</span>
-              Delete Appointment
-            </button>
-          )}
-        </div>
-      )}
+      <div className="fixed bottom-0 left-0 right-0 bg-white dark:bg-gray-800 border-t border-gray-100 dark:border-gray-700 px-4 py-4 safe-area-inset-bottom shadow-lg space-y-2.5">
+        {canCancel && (
+          <button
+            onClick={() => { setActionError(null); setConfirmAction('cancel'); }}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 text-amber-600 dark:text-amber-400 text-sm font-black active:scale-[0.98] transition-transform"
+          >
+            <span className="material-icons-round text-xl">cancel</span>
+            Cancel Appointment
+          </button>
+        )}
+        {canDelete && (
+          <button
+            onClick={() => { setActionError(null); setConfirmAction('delete'); }}
+            className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 text-red-500 dark:text-red-400 text-sm font-black active:scale-[0.98] transition-transform"
+          >
+            <span className="material-icons-round text-xl">delete_forever</span>
+            Delete Appointment
+          </button>
+        )}
+        <button
+          onClick={handleRaiseComplaint}
+          className="w-full flex items-center justify-center gap-2 py-3.5 rounded-2xl bg-purple-50 dark:bg-purple-900/20 border border-purple-200 dark:border-purple-800 text-purple-600 dark:text-purple-400 text-sm font-black active:scale-[0.98] transition-transform"
+        >
+          <span className="material-icons-round text-xl">report_problem</span>
+          Raise Complaint
+        </button>
+      </div>
 
       {/* Confirmation dialog */}
       {confirmAction && (

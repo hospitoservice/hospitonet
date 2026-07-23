@@ -1,7 +1,7 @@
 const CACHE = 'hospitonet-v1';
 
 // API paths — always go to network, never cache
-const API_PREFIXES = ['/api', '/otp', '/patient', '/appointment'];
+const API_PREFIXES = ['/api', '/otp', '/patient', '/appointment-graphql'];
 
 const isApiCall = (url) =>
   API_PREFIXES.some(p => new URL(url).pathname.startsWith(p));

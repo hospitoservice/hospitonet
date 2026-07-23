@@ -96,28 +96,30 @@ const AppointmentBookingScreen: React.FC = () => {
             }).catch(() => { /* session may not yet exist — user fills manually */ });
         }
 
-        if (!hospital?.id) return;
+        const hid = hospital?.hospitalId ?? hospital?.id;
+        if (!hid) return;
         setLoadingDepts(true);
-        DepartmentService.getDepartmentsByHospital(hospital.id)
+        DepartmentService.getDepartmentsByHospital(hid)
             .then(setDepartments)
             .catch(() => setDepartments([]))
             .finally(() => setLoadingDepts(false));
-    }, [hospital?.id]);
+    }, [hospital?.hospitalId, hospital?.id]);
 
     // ── Step 2: fetch doctors when department changes ──────────────────────────
     const fetchDoctors = useCallback(async (deptId: string) => {
-        if (!hospital?.id || !deptId) { setDoctors([]); return; }
+        const hid = hospital?.hospitalId ?? hospital?.id;
+        if (!hid || !deptId) { setDoctors([]); return; }
         setLoadingDocs(true);
         setDoctors([]);
         try {
-            const list = await DepartmentService.getDoctorsByDepartment(hospital.id, deptId);
+            const list = await DepartmentService.getDoctorsByDepartment(hid, deptId);
             setDoctors(list);
         } catch {
             setDoctors([]);
         } finally {
             setLoadingDocs(false);
         }
-    }, [hospital?.id]);
+    }, [hospital?.hospitalId, hospital?.id]);
 
     // ── Step 3: fetch slots when doctor + date are both set ────────────────────
     const fetchSlots = useCallback(async (staffId: string, date: string) => {
@@ -230,6 +232,14 @@ const AppointmentBookingScreen: React.FC = () => {
                 liveConsultant:  '',
                 status:          'Scheduled',
                 message:         formData.notes || 'Appointment booking',
+                // Pass staffId + slotId so appointment-service can mark the slot
+                // as BOOKED in employee-service via its internal service call.
+                staffId:         selectedSlot.slotId && !selectedSlot.slotId.startsWith('fallback-')
+                                     ? formData.doctor
+                                     : undefined,
+                slotId:          selectedSlot.slotId && !selectedSlot.slotId.startsWith('fallback-')
+                                     ? selectedSlot.slotId
+                                     : undefined,
                 symptoms:        formData.symptoms ? { otherSymptoms: formData.symptoms } : undefined,
                 hospital:        hospital
                     ? { hospitalId: hospital.hospitalId ?? hospital.id, hospitalName: hospital.name, hospitalLocation: { city: hospital.location ?? '' } }
@@ -237,20 +247,6 @@ const AppointmentBookingScreen: React.FC = () => {
             };
 
             const appointment = await AppointmentService.createAppointment(appointmentInput);
-
-            // Mark the slot as BOOKED in employee-service (best-effort, non-blocking)
-            if (selectedSlot.slotId && !selectedSlot.slotId.startsWith('fallback-')) {
-                fetch(`/api/employees/${formData.doctor}/schedule/book`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({
-                        date:          formData.date,
-                        slotId:        selectedSlot.slotId,
-                        patientId,
-                        appointmentId: appointment.id ?? '',
-                    }),
-                }).catch(err => console.warn('Slot booking sync failed:', err));
-            }
 
             setShowConfirmation(true);
             setTimeout(() => navigate('/'), 2500);

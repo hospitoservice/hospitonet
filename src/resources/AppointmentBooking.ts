@@ -48,11 +48,19 @@ export interface AvailableSlot {
 }
 
 export const DEPARTMENTS: Department[] = [
-    { id: 'cardio', name: 'Cardiology', doctors: ['doc1', 'doc2'] },
-    { id: 'neuro', name: 'Neurology', doctors: ['doc3'] },
-    { id: 'ortho', name: 'Orthopedics', doctors: ['doc4', 'doc5'] },
-    { id: 'ped', name: 'Pediatrics', doctors: ['doc6'] },
-    { id: 'derm', name: 'Dermatology', doctors: ['doc7'] },
+    { id: 'cardiology',   name: 'Cardiology',   doctors: ['doc1', 'doc2'] },
+    { id: 'dermatology',  name: 'Dermatology',  doctors: ['doc7'] },
+    { id: 'emergency',    name: 'Emergency',    doctors: [] },
+    { id: 'ent',          name: 'ENT',          doctors: [] },
+    { id: 'general',      name: 'General',      doctors: [] },
+    { id: 'gynecology',   name: 'Gynecology',   doctors: [] },
+    { id: 'neurology',    name: 'Neurology',    doctors: ['doc3'] },
+    { id: 'ophthalmology',name: 'Ophthalmology',doctors: [] },
+    { id: 'orthopedics',  name: 'Orthopedics',  doctors: ['doc4', 'doc5'] },
+    { id: 'pediatrics',   name: 'Pediatrics',   doctors: ['doc6'] },
+    { id: 'psychiatry',   name: 'Psychiatry',   doctors: [] },
+    { id: 'radiology',    name: 'Radiology',    doctors: [] },
+    { id: 'surgery',      name: 'Surgery',      doctors: [] },
 ];
 
 export const DOCTORS: Record<string, Doctor> = {

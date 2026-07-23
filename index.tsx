@@ -2,6 +2,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
 import App from './App';
+import ThemeService from '@/src/service/ThemeService';
+
+// Apply the saved/OS theme before the first paint to avoid a light-mode flash.
+ThemeService.init();
 
 // Register service worker only in production builds.
 // Vite dev server is incompatible with SW caching (HMR, virtual modules).

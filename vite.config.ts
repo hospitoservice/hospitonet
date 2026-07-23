@@ -25,10 +25,14 @@ export default defineConfig(({ mode }) => {
             rewrite: (path: string) => path.replace(/^\/patient/, ''),
             headers: { origin: 'http://localhost:3001' },
           },
-          '/appointment': {
+          // Named "/appointment-graphql" (not "/appointment") so it doesn't collide
+          // with the client-side route "/appointment/:id" — a hard navigation or
+          // refresh on that route used to be swallowed by this proxy rule instead
+          // of being served by the SPA, producing a 404 from appointment-service.
+          '/appointment-graphql': {
             target: process.env.VITE_APPOINTMENT_PROXY_TARGET || env.VITE_APPOINTMENT_PROXY_TARGET || 'http://localhost:8080',
             changeOrigin: true,
-            rewrite: (path: string) => path.replace(/^\/appointment/, ''),
+            rewrite: (path: string) => path.replace(/^\/appointment-graphql/, '/graphql'),
             headers: { origin: 'http://localhost:3001' },
           },
           // Employee service — MUST be registered before the broad /api catch-all.

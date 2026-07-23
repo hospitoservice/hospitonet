@@ -4,6 +4,7 @@ import { BookedAppointment } from '../../types';
 import UserService, { UserProfile } from '../service/UserService';
 import AppointmentService from '../service/AppointmentService';
 import ImageUploadService from '../service/ImageUploadService';
+import ComplaintService, { Complaint } from '../service/ComplaintService';
 
 interface ProfileScreenProps {
   onLogout: () => void;
@@ -75,9 +76,16 @@ function calculateAge(dob: string): number {
 
 const STATUS_STYLE: Record<string, { pill: string; dot: string }> = {
   Scheduled:     { pill: 'bg-blue-50 text-blue-600',   dot: 'bg-blue-500' },
+  Confirmed:     { pill: 'bg-blue-50 text-blue-600',   dot: 'bg-blue-500' },
   'In Progress': { pill: 'bg-amber-50 text-amber-600', dot: 'bg-amber-500' },
   Completed:     { pill: 'bg-green-50 text-green-600', dot: 'bg-green-500' },
   Cancelled:     { pill: 'bg-red-50 text-red-600',     dot: 'bg-red-500' },
+};
+
+const COMPLAINT_STATUS_STYLE: Record<string, { pill: string; dot: string }> = {
+  PENDING:  { pill: 'bg-amber-50 text-amber-600', dot: 'bg-amber-500' },
+  REVIEWED: { pill: 'bg-blue-50 text-blue-600',   dot: 'bg-blue-500' },
+  RESOLVED: { pill: 'bg-green-50 text-green-600', dot: 'bg-green-500' },
 };
 
 const DEPT_ICON: Record<string, string> = {
@@ -194,10 +202,42 @@ const AppointmentCard: React.FC<{ appt: BookedAppointment; onPress: () => void }
   );
 };
 
+// ── Complaint card ────────────────────────────────────────────────────────────
+
+const ComplaintCard: React.FC<{ complaint: Complaint }> = ({ complaint }) => {
+  const statusStyle = COMPLAINT_STATUS_STYLE[complaint.status?.toUpperCase()] ?? COMPLAINT_STATUS_STYLE.PENDING;
+
+  return (
+    <div className="w-full bg-white dark:bg-gray-800 rounded-3xl p-4 shadow-sm border border-gray-100 dark:border-gray-700">
+      <div className="flex justify-between items-start gap-2">
+        <div className="min-w-0">
+          <h4 className="font-bold text-sm text-gray-900 dark:text-white leading-tight">{complaint.subject}</h4>
+          <p className="text-[10px] text-primary font-black uppercase tracking-tighter mt-0.5">Against: {complaint.against}</p>
+        </div>
+        <span className={`ml-2 flex-shrink-0 flex items-center gap-1 text-[9px] font-black uppercase tracking-widest px-2 py-1 rounded-lg ${statusStyle.pill}`}>
+          <span className={`w-1.5 h-1.5 rounded-full ${statusStyle.dot}`} />
+          {complaint.status}
+        </span>
+      </div>
+      <p className="text-xs text-gray-500 dark:text-gray-400 mt-2 leading-relaxed line-clamp-3">{complaint.description}</p>
+      {complaint.comment && (
+        <div className="mt-2 px-3 py-2 rounded-2xl bg-blue-50 dark:bg-blue-900/20 border border-blue-100 dark:border-blue-900/30">
+          <p className="text-[9px] font-black text-blue-600 dark:text-blue-400 uppercase tracking-widest">Admin Response</p>
+          <p className="text-xs text-gray-700 dark:text-gray-300 mt-0.5 leading-relaxed">{complaint.comment}</p>
+        </div>
+      )}
+      <div className="flex items-center gap-1 text-[9px] text-gray-400 font-bold uppercase tracking-widest mt-3">
+        <span className="material-icons-round text-xs">calendar_today</span>
+        {formatDate(complaint.createdAt?.split('T')[0])}
+      </div>
+    </div>
+  );
+};
+
 // ── Main screen ───────────────────────────────────────────────────────────────
 
 const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
-  const [activeView, setActiveView] = useState<'profile' | 'appointments' | 'edit'>('profile');
+  const [activeView, setActiveView] = useState<'profile' | 'appointments' | 'complaints' | 'edit'>('profile');
   const [activeTab, setActiveTab]   = useState<'upcoming' | 'past'>('upcoming');
 
   const [user,        setUser]        = useState<UserProfile | null>(null);
@@ -207,6 +247,11 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
   const [apptLoading,  setApptLoading]  = useState(false);
   const [apptError,    setApptError]    = useState<string | null>(null);
   const [apptLoaded,   setApptLoaded]   = useState(false);
+
+  const [complaints,        setComplaints]        = useState<Complaint[]>([]);
+  const [complaintsLoading, setComplaintsLoading]  = useState(false);
+  const [complaintsError,   setComplaintsError]    = useState<string | null>(null);
+  const [complaintsLoaded,  setComplaintsLoaded]   = useState(false);
 
   // Edit form state
   const [form,          setForm]          = useState<EditForm>(BLANK_FORM);
@@ -276,6 +321,35 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
       loadAppointments(phone); // pass mobile — backend query spans all hospitals
     } else {
       setApptLoading(false);
+    }
+  };
+
+  // ── Complaints ───────────────────────────────────────────────────────────────
+
+  const handleOpenComplaints = async () => {
+    setActiveView('complaints');
+    setComplaintsLoaded(false);
+    setComplaints([]);
+    setComplaintsError(null);
+    setComplaintsLoading(true);
+
+    const userId = UserService.getUserIdFromSession();
+    if (!userId) {
+      setComplaintsLoading(false);
+      setComplaintsError('Unable to identify your account. Please log in again.');
+      return;
+    }
+
+    try {
+      const data = await ComplaintService.getMyComplaints(userId);
+      data.sort((a, b) => (b.createdAt ?? '').localeCompare(a.createdAt ?? ''));
+      setComplaints(data);
+      setComplaintsLoaded(true);
+    } catch (err) {
+      console.error('loadComplaints failed:', err);
+      setComplaintsError('Failed to load complaints. Please try again.');
+    } finally {
+      setComplaintsLoading(false);
     }
   };
 
@@ -416,7 +490,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
   };
 
   // ── Derived ───────────────────────────────────────────────────────────────────
-  const upcomingAppts = appointments.filter(a => a.status === 'Scheduled' || a.status === 'In Progress');
+  const upcomingAppts = appointments.filter(a => a.status === 'Scheduled' || a.status === 'Confirmed' || a.status === 'In Progress');
   const pastAppts     = appointments.filter(a => a.status === 'Completed'  || a.status === 'Cancelled');
   const displayed     = activeTab === 'upcoming' ? upcomingAppts : pastAppts;
 
@@ -427,6 +501,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
   const menuItems = [
     { icon: 'calendar_today', label: 'My Appointments', color: 'text-blue-500',   action: handleOpenAppointments },
     { icon: 'shopping_bag',   label: 'Orders',          color: 'text-red-500',    action: () => navigate('/orders') },
+    { icon: 'report',         label: 'My Complaints',   color: 'text-orange-500', action: handleOpenComplaints },
     { icon: 'people',         label: 'Family Members',  color: 'text-purple-500', action: undefined },
     { icon: 'payment',        label: 'Payment Methods', color: 'text-green-500',  action: undefined },
     { icon: 'help_outline',   label: 'Help & Support',  color: 'text-cyan-500',   action: undefined },
@@ -501,6 +576,55 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
               {displayed.map(appt => (
                 <AppointmentCard key={appt.id} appt={appt} onPress={() => navigate(`/appointment/${appt.id}`, { state: { appointment: appt } })} />
               ))}
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // ── Complaints view ───────────────────────────────────────────────────────────
+  if (activeView === 'complaints') {
+    return (
+      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900 pb-28">
+        <header className="bg-primary pt-14 pb-8 px-6 rounded-b-[3rem] shadow-xl text-white">
+          <div className="flex items-center gap-4">
+            <button onClick={() => setActiveView('profile')} className="p-2 bg-white/20 rounded-2xl backdrop-blur-md">
+              <span className="material-icons-round">arrow_back</span>
+            </button>
+            <h2 className="text-xl font-black tracking-tight">My Complaints</h2>
+          </div>
+        </header>
+
+        <div className="px-6 py-6 space-y-4">
+          {/* Skeleton */}
+          {complaintsLoading && (
+            <div className="space-y-3">
+              {[1, 2, 3].map(i => <div key={i} className="bg-white rounded-3xl p-4 h-24 animate-pulse border border-gray-100" />)}
+            </div>
+          )}
+
+          {/* Error state */}
+          {!complaintsLoading && complaintsError && (
+            <div className="bg-red-50 border border-red-100 rounded-2xl p-4 text-center">
+              <p className="text-sm text-red-600 font-bold">{complaintsError}</p>
+              <button onClick={handleOpenComplaints} className="mt-2 text-xs text-primary font-black uppercase tracking-widest">Retry</button>
+            </div>
+          )}
+
+          {/* Empty state */}
+          {!complaintsLoading && !complaintsError && complaintsLoaded && complaints.length === 0 && (
+            <div className="flex flex-col items-center py-16 text-center">
+              <span className="material-icons-round text-gray-300 text-5xl mb-3">report</span>
+              <p className="text-sm font-bold text-gray-500">No complaints filed yet.</p>
+              <p className="text-xs text-gray-400 mt-1">Complaints can be raised from an appointment's detail screen.</p>
+            </div>
+          )}
+
+          {/* Complaint list */}
+          {!complaintsLoading && !complaintsError && complaints.length > 0 && (
+            <div className="space-y-3">
+              {complaints.map(c => <ComplaintCard key={c.id} complaint={c} />)}
             </div>
           )}
         </div>

@@ -19,6 +19,14 @@
     <!-- Android -->
     <meta name="mobile-web-app-capable" content="yes">
     <script src="https://cdn.tailwindcss.com?plugins=forms,typography"></script>
+    <script>
+      // Without this, the CDN build defaults to darkMode: "media" (pure OS
+      // preference) and silently ignores any manually-toggled `dark` class —
+      // which is how the app's theme toggle applies light/dark mode.
+      tailwind.config = {
+        darkMode: "class",
+      }
+    </script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Outlined" rel="stylesheet">
@@ -35,6 +43,9 @@
             -webkit-tap-highlight-color: transparent;
             -webkit-touch-callout: none;
             overscroll-behavior: none;
+        }
+        .dark body {
+            background-color: #111827; /* gray-900 — matches the screens' dark:bg-gray-900 */
         }
         .hide-scrollbar::-webkit-scrollbar {
             display: none;

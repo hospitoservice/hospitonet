@@ -1,8 +1,9 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Screen } from './types';
 import UserService from '@/src/service/UserService';
+import ThemeService from '@/src/service/ThemeService';
 
 // Import all screens
 import HomeScreen from '@/src/screens/HomeScreen';
@@ -21,13 +22,13 @@ import LabtestScreen from "@/src/screens/LabtestScreen.tsx";
 import AppointmentBookingScreen from "@/src/screens/AppointmentBookingScreen.tsx";
 import AppointmentDetailScreen from "@/src/screens/AppointmentDetailScreen.tsx";
 import CheckoutScreen from '@/src/screens/CheckoutScreen';
+import RaiseComplaintScreen from '@/src/screens/RaiseComplaintScreen';
 
 const ProtectedRoute: React.FC<{ element: React.ReactElement }> = ({ element }) => {
   return UserService.getPhoneFromSession() ? element : <Navigate to="/login" replace />;
 };
 
 const AppContent: React.FC = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
@@ -46,15 +47,12 @@ const AppContent: React.FC = () => {
     && currentScreen !== Screen.ASSISTANT
     && currentScreen !== Screen.VERIFY
     && currentScreen !== Screen.CHECKOUT
-    && !location.pathname.startsWith('/appointment/');
+    && !location.pathname.startsWith('/appointment/')
+    && location.pathname !== '/raise-complaint';
 
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
+  const toggleTheme = () => {
+    ThemeService.setTheme(ThemeService.getTheme() === 'dark' ? 'light' : 'dark');
+  };
 
   const handleNavigate = (screen: Screen) => {
     navigate(screen === Screen.HOME ? '/' : `/${screen.toLowerCase()}`);
@@ -85,6 +83,7 @@ const AppContent: React.FC = () => {
           <Route path="/book-appointment" element={<ProtectedRoute element={<AppointmentBookingScreen />} />} />
           <Route path="/appointment/:id" element={<ProtectedRoute element={<AppointmentDetailScreen />} />} />
           <Route path="/checkout" element={<ProtectedRoute element={<CheckoutScreen />} />} />
+          <Route path="/raise-complaint" element={<ProtectedRoute element={<RaiseComplaintScreen />} />} />
           
           {/* 404 - Not Found */}
           <Route path="*" element={
@@ -113,15 +112,16 @@ const AppContent: React.FC = () => {
       )}
 
       {/* Dark Mode Toggle */}
-      {/*{currentScreen !== Screen.LOGIN && (*/}
-      {/*  <button */}
-      {/*    onClick={() => setIsDarkMode(!isDarkMode)}*/}
-      {/*    className="fixed bottom-28 right-4 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg z-[60] border border-gray-100 dark:border-gray-700 transition-transform active:scale-90"*/}
-      {/*  >*/}
-      {/*    <span className="material-icons-round text-primary block dark:hidden">dark_mode</span>*/}
-      {/*    <span className="material-icons-round text-yellow-400 hidden dark:block">light_mode</span>*/}
-      {/*  </button>*/}
-      {/*)}*/}
+      {currentScreen !== Screen.LOGIN && (
+        <button
+          onClick={toggleTheme}
+          aria-label="Toggle dark mode"
+          className="fixed bottom-28 right-4 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg z-[60] border border-gray-100 dark:border-gray-700 transition-transform active:scale-90"
+        >
+          <span className="material-icons-round text-primary block dark:hidden">dark_mode</span>
+          <span className="material-icons-round text-yellow-400 hidden dark:block">light_mode</span>
+        </button>
+      )}
 
       <style>{`
         :root {

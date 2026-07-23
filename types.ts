@@ -149,6 +149,8 @@ export interface BookedAppointment {
   status: string;
   message?: string;
   liveConsultant?: string;
+  staffId?: string;
+  slotId?: string;
   vitals?: AppointmentVitals;
   symptoms?: AppointmentSymptoms;
   doctorComments?: string;
