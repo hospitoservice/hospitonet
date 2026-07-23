@@ -261,6 +261,8 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
   const [photoUploading, setPhotoUploading] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
 
+  const [showHelpModal, setShowHelpModal] = useState(false);
+
   const navigate = useNavigate();
 
   // ── Fetch user on mount ──────────────────────────────────────────────────────
@@ -502,10 +504,10 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
     { icon: 'calendar_today', label: 'My Appointments', color: 'text-blue-500',   action: handleOpenAppointments },
     { icon: 'shopping_bag',   label: 'Orders',          color: 'text-red-500',    action: () => navigate('/orders') },
     { icon: 'report',         label: 'My Complaints',   color: 'text-orange-500', action: handleOpenComplaints },
-    { icon: 'people',         label: 'Family Members',  color: 'text-purple-500', action: undefined },
-    { icon: 'payment',        label: 'Payment Methods', color: 'text-green-500',  action: undefined },
-    { icon: 'help_outline',   label: 'Help & Support',  color: 'text-cyan-500',   action: undefined },
-    { icon: 'settings',       label: 'App Settings',    color: 'text-gray-500',   action: undefined },
+    { icon: 'people',         label: 'Family Members',  color: 'text-purple-500', action: () => navigate('/family-members') },
+    { icon: 'payment',        label: 'Payment Methods', color: 'text-green-500',  action: () => navigate('/payment-methods') },
+    { icon: 'help_outline',   label: 'Help & Support',  color: 'text-cyan-500',   action: () => setShowHelpModal(true) },
+    { icon: 'settings',       label: 'App Settings',    color: 'text-gray-500',   action: () => navigate('/settings') },
   ];
 
   // ── Appointments view ─────────────────────────────────────────────────────────
@@ -795,6 +797,64 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
         <div className="fixed top-6 left-1/2 -translate-x-1/2 z-50 bg-green-500 text-white px-6 py-3 rounded-2xl shadow-xl flex items-center gap-2 text-sm font-bold">
           <span className="material-icons-round text-base">check_circle</span>
           Profile updated successfully!
+        </div>
+      )}
+
+      {/* Help & Support modal */}
+      {showHelpModal && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center bg-black/40 backdrop-blur-sm px-4 pt-16"
+          onClick={() => setShowHelpModal(false)}
+        >
+          <div
+            className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-3xl p-6 shadow-2xl"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="flex items-center justify-between mb-1">
+              <h2 className="text-base font-black text-gray-900 dark:text-white">Help & Support</h2>
+              <button
+                onClick={() => setShowHelpModal(false)}
+                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+              >
+                <span className="material-icons-round text-gray-400">close</span>
+              </button>
+            </div>
+            <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">We're here to help. Reach out anytime.</p>
+
+            <div className="space-y-3">
+              <a
+                href="mailto:support@hospitonet.com"
+                className="w-full flex items-center gap-3 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-2xl hover:bg-blue-100 dark:hover:bg-blue-900/30 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-xl bg-blue-100 dark:bg-blue-800 flex items-center justify-center flex-shrink-0">
+                  <span className="material-icons-round text-blue-600 dark:text-blue-300">mail_outline</span>
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                  <h4 className="font-bold text-sm text-gray-900 dark:text-white">Email Us</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400 truncate">contact@hospitonet.com</p>
+                </div>
+                <span className="material-icons-round text-gray-400">chevron_right</span>
+              </a>
+
+              <a
+                href="https://wa.me/919798047291"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="w-full flex items-center gap-3 p-4 bg-green-50 dark:bg-green-900/20 rounded-2xl hover:bg-green-100 dark:hover:bg-green-900/30 transition-colors"
+              >
+                <div className="w-10 h-10 rounded-xl bg-green-500 flex items-center justify-center flex-shrink-0">
+                  <svg viewBox="0 0 24 24" className="w-5 h-5 text-white" fill="currentColor">
+                    <path d="M12.04 2C6.58 2 2.13 6.45 2.13 11.91c0 1.75.46 3.48 1.32 5.01L2 22l5.25-1.38a9.9 9.9 0 0 0 4.79 1.22h.01c5.46 0 9.91-4.45 9.91-9.91 0-2.65-1.03-5.14-2.9-7.01A9.82 9.82 0 0 0 12.04 2zm5.83 14.13c-.25.7-1.24 1.28-2.03 1.45-.55.12-1.26.21-3.67-.79-3.08-1.28-5.06-4.4-5.21-4.61-.15-.2-1.25-1.66-1.25-3.17 0-1.51.79-2.25 1.07-2.56.28-.31.61-.39.82-.39.2 0 .41 0 .59.01.19.01.44-.07.69.53.25.61.86 2.1.93 2.25.07.15.12.33.02.53-.1.2-.15.33-.3.51-.15.18-.31.4-.44.54-.15.15-.3.32-.13.62.17.3.76 1.25 1.63 2.03 1.12 1 2.06 1.31 2.36 1.46.3.15.48.13.66-.08.18-.2.76-.89.97-1.19.2-.3.4-.25.68-.15.28.1 1.77.83 2.07.98.3.15.5.23.57.36.08.13.08.75-.17 1.45z" />
+                  </svg>
+                </div>
+                <div className="text-left flex-1 min-w-0">
+                  <h4 className="font-bold text-sm text-gray-900 dark:text-white">WhatsApp</h4>
+                  <p className="text-xs text-gray-500 dark:text-gray-400">+91 98765 43210</p>
+                </div>
+                <span className="material-icons-round text-gray-400">chevron_right</span>
+              </a>
+            </div>
+          </div>
         </div>
       )}
 

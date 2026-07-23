@@ -26,6 +26,19 @@ export interface InsuranceInformation {
   insuranceAmount?: number;
 }
 
+export interface PaymentMethod {
+  id?: string;
+  type: 'CARD' | 'UPI' | 'OTHER';
+  label?: string;
+  cardLast4?: string;
+  cardBrand?: string;
+  cardExpiry?: string;
+  cardHolderName?: string;
+  upiId?: string;
+  otherDetails?: string;
+  isDefault?: boolean;
+}
+
 export interface UserProfile {
   id?: string;
   userId?: string;
@@ -52,6 +65,7 @@ export interface UserProfile {
   medicalHistoryList?: MedicalHistory[];
   insuranceInformation?: InsuranceInformation;
   appointmentIdList?: string[];
+  paymentMethods?: PaymentMethod[];
 }
 
 const BASE_URL = '/api/users';
@@ -98,6 +112,24 @@ class UserService {
       body: JSON.stringify({ patientId }),
     });
     if (!res.ok) throw new Error(`Failed to link patient: ${res.status}`);
+    return res.json();
+  }
+
+  async addPaymentMethod(id: string, paymentMethod: Omit<PaymentMethod, 'id'>): Promise<UserProfile> {
+    const res = await fetch(`${BASE_URL}/${id}/payment-methods`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(paymentMethod),
+    });
+    if (!res.ok) throw new Error(`Failed to add payment method: ${res.status}`);
+    return res.json();
+  }
+
+  async removePaymentMethod(id: string, paymentMethodId: string): Promise<UserProfile> {
+    const res = await fetch(`${BASE_URL}/${id}/payment-methods/${paymentMethodId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to remove payment method: ${res.status}`);
     return res.json();
   }
 
