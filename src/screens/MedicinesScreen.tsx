@@ -1,49 +1,87 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Medicine, Appointment } from '../../types.ts';
+import { Medicine, Appointment, BookedAppointment } from '../../types.ts';
 import PrescriptionHub from '@/src/components/PrescriptionHub.tsx';
 import { Medicines } from '@/src/resources/Medicines';
 import { MEDICINES_CONFIG } from '@/src/resources/MedicinesScreenConfig.js';
+import MedicineService from '../service/MedicineService';
+import UserService from '../service/UserService';
+import AppointmentService from '../service/AppointmentService';
+import FavouritesService from '../service/FavouritesService';
 import CartScreen, { CartItem } from '@/src/screens/CartScreen';
 
-const MEDICINES = Medicines;
 const C = MEDICINES_CONFIG;
+
+function toAppointmentStatus(status?: string): Appointment['status'] {
+  const s = status?.toLowerCase() ?? '';
+  if (s.includes('cancel')) return 'Cancelled';
+  if (s.includes('complete')) return 'Completed';
+  return 'Upcoming';
+}
+
+function mapBookedAppointment(appt: BookedAppointment): Appointment {
+  return {
+    id: appt.id,
+    doctorName: appt.doctor ?? 'Doctor',
+    specialty: appt.department,
+    hospital: appt.hospital?.hospitalName ?? '',
+    date: appt.appointmentDate,
+    time: appt.slot,
+    status: toAppointmentStatus(appt.status),
+    image: '',
+    prescription: (appt.medicine ?? []).map(m => m.medicineName ?? 'Medicine'),
+  };
+}
 
 const MedicinesScreen: React.FC = () => {
   const navigate = useNavigate();
+  const [medicines, setMedicines] = useState<Medicine[]>(Medicines as Medicine[]);
   const [cart, setCart] = useState<CartItem[]>([]);
+
+  useEffect(() => {
+    MedicineService.getMedicines().then(setMedicines);
+  }, []);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [showPrescriptionHub, setShowPrescriptionHub] = useState(false);
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [favourites, setFavourites] = useState<Set<string>>(new Set());
+  const [favouritesBusy, setFavouritesBusy] = useState<Set<string>>(new Set());
+  const [userId, setUserId] = useState<string | null>(null);
 
   useEffect(() => {
-    const mockAppointments: Appointment[] = [
-      {
-        id: '1',
-        doctorName: 'Dr. Sarah Johnson',
-        specialty: 'Cardiologist',
-        hospital: 'Apollo Hospital',
-        date: 'Oct 24, 2024',
-        time: '10:30 AM',
-        status: 'Completed',
-        image: 'https://picsum.photos/seed/doc1/100/100',
-        prescription: ['https://images.unsplash.com/photo-1587854692152-cbe660dbbb88?auto=format&fit=crop&w=400&q=80'],
-      },
-      {
-        id: '2',
-        doctorName: 'Dr. Aman Gupta',
-        specialty: 'General Physician',
-        hospital: 'Yashoda Hospital',
-        date: 'Sep 12, 2024',
-        time: '02:00 PM',
-        status: 'Completed',
-        image: 'https://picsum.photos/seed/doc2/100/100',
-        prescription: ['https://images.unsplash.com/photo-1628771065518-0d82f1110547?auto=format&fit=crop&w=400&q=80'],
-      },
-    ];
-    setAppointments(mockAppointments);
+    FavouritesService.getFavouriteRefIds('MEDICINE').then(setFavourites);
+  }, []);
+
+  useEffect(() => {
+    (async () => {
+      try {
+        const phone = UserService.getPhoneFromSession();
+        if (!phone) return;
+
+        const user = await UserService.getUserByPhone(phone);
+        if (!user) return;
+        if (user.id) setUserId(user.id);
+
+        const [byId, byMobile] = await Promise.all([
+          user.patientId
+            ? AppointmentService.getAppointmentsByPatientId(user.patientId).catch(() => [] as BookedAppointment[])
+            : Promise.resolve([] as BookedAppointment[]),
+          AppointmentService.getAppointmentsByMobile(phone).catch(() => [] as BookedAppointment[]),
+        ]);
+
+        const seen = new Set<string>();
+        const merged: BookedAppointment[] = [];
+        for (const appt of [...byId, ...byMobile]) {
+          if (!seen.has(appt.id)) { seen.add(appt.id); merged.push(appt); }
+        }
+        merged.sort((a, b) => (b.appointmentDate ?? '').localeCompare(a.appointmentDate ?? ''));
+
+        setAppointments(merged.map(mapBookedAppointment));
+      } catch (err) {
+        console.error('Failed to load appointments for prescriptions', err);
+      }
+    })();
   }, []);
 
   const handlePrescriptionSelect = (_prescription: { image: string; appointmentId?: string }) => {
@@ -60,12 +98,34 @@ const MedicinesScreen: React.FC = () => {
 
   const removeFromCart = (id: string) => setCart(prev => prev.filter(i => i.id !== id));
 
-  const toggleFavourite = (id: string) => {
-    setFavourites(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const toggleFavourite = async (med: Medicine) => {
+    if (!userId || favouritesBusy.has(med.id)) return;
+    const isFav = favourites.has(med.id);
+
+    setFavouritesBusy(prev => new Set(prev).add(med.id));
+    try {
+      if (isFav) {
+        await FavouritesService.removeFavourite(userId, 'MEDICINE', med.id);
+        setFavourites(prev => { const next = new Set(prev); next.delete(med.id); return next; });
+      } else {
+        await FavouritesService.addFavourite(userId, {
+          favouriteType: 'MEDICINE',
+          refId: med.id,
+          name: med.name,
+          image: med.image,
+          subtitle: med.manufacturer,
+          price: med.price,
+          originalPrice: med.originalPrice,
+          rating: med.rating,
+          reviews: med.reviews,
+        });
+        setFavourites(prev => new Set(prev).add(med.id));
+      }
+    } catch (err) {
+      console.error('Failed to update favourite:', err);
+    } finally {
+      setFavouritesBusy(prev => { const next = new Set(prev); next.delete(med.id); return next; });
+    }
   };
 
   const cartCount = cart.reduce((t, i) => t + i.quantity, 0);
@@ -172,7 +232,7 @@ const MedicinesScreen: React.FC = () => {
 
         {/* Medicine Grid */}
         <div className="grid grid-cols-2 gap-3">
-          {MEDICINES.map((med) => {
+          {medicines.map((med) => {
             const inCart = cart.find(i => i.id === med.id);
             const isFav = favourites.has(med.id);
             const discountPct = med.originalPrice
@@ -204,8 +264,9 @@ const MedicinesScreen: React.FC = () => {
 
                   {/* Favourite */}
                   <button
-                    onClick={() => toggleFavourite(med.id)}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/80 dark:bg-gray-900/70 backdrop-blur-sm flex items-center justify-center shadow transition-all active:scale-90"
+                    onClick={() => toggleFavourite(med)}
+                    disabled={favouritesBusy.has(med.id)}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/80 dark:bg-gray-900/70 backdrop-blur-sm flex items-center justify-center shadow transition-all active:scale-90 disabled:opacity-60"
                   >
                     <span className={`material-icons-round text-sm ${isFav ? 'text-red-500' : 'text-gray-300'}`}>
                       {isFav ? 'favorite' : 'favorite_border'}

@@ -1,14 +1,22 @@
 // src/screens/LabtestScreen.tsx
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { LAB_TESTS, TEST_CATEGORIES } from '../resources/LabTest';
+import { LAB_TESTS, TEST_CATEGORIES, LabTest, TestCategory } from '../resources/LabTest';
+import LabTestService from '../service/LabTestService';
 
 const LabtestScreen: React.FC = () => {
     const [activeCategory, setActiveCategory] = useState('all');
     const [searchQuery, setSearchQuery] = useState('');
+    const [labTests, setLabTests] = useState<LabTest[]>(LAB_TESTS);
+    const [categories, setCategories] = useState<TestCategory[]>(TEST_CATEGORIES);
     const navigate = useNavigate();
 
-    const filteredTests = LAB_TESTS.filter(test => {
+    useEffect(() => {
+        LabTestService.getLabTests().then(setLabTests);
+        LabTestService.getCategories().then(setCategories);
+    }, []);
+
+    const filteredTests = labTests.filter(test => {
         const matchesCategory =
             activeCategory === 'all' ||
             (activeCategory === 'popular' ? test.popular : test.category.toLowerCase() === activeCategory);
@@ -49,7 +57,7 @@ const LabtestScreen: React.FC = () => {
             {/* Categories */}
             <div className="px-6 mt-6">
                 <div className="flex space-x-2 overflow-x-auto pb-2 hide-scrollbar">
-                    {TEST_CATEGORIES.map((category) => (
+                    {categories.map((category) => (
                         <button
                             key={category.id}
                             onClick={() => setActiveCategory(category.id)}

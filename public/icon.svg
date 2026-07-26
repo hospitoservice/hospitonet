@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <!-- Background -->
+  <rect width="512" height="512" rx="112" fill="#06b6d4"/>
+  <!-- Medical cross -->
+  <rect x="196" y="112" width="120" height="288" rx="24" fill="white"/>
+  <rect x="112" y="196" width="288" height="120" rx="24" fill="white"/>
+  <!-- Heart overlay (small, bottom-right) -->
+  <g transform="translate(310,310) scale(0.55)">
+    <path d="M128 32C92.7 32 64 60.7 64 96c0 25.5 14.7 47.6 36.1 58.2L128 192l27.9-37.8C177.3 143.6 192 121.5 192 96c0-35.3-28.7-64-64-64z" fill="#0e7490"/>
+  </g>
+</svg>

@@ -1,0 +1,67 @@
+import { PatientLink } from './UserService';
+
+export interface FamilyMember {
+  id?: string;
+  userId?: string;
+  firstName?: string;
+  lastName?: string;
+  relation?: string;
+  dateOfBirth?: string;
+  gender?: string;
+  bloodGroup?: string;
+  mobile?: string;
+  email?: string;
+  patientId?: string;
+  patientLinks?: PatientLink[];
+}
+
+const BASE_URL = '/api/users';
+
+class FamilyMemberService {
+  async getFamilyMembers(userId: string): Promise<FamilyMember[]> {
+    const res = await fetch(`${BASE_URL}/${userId}/family-members`);
+    if (!res.ok) throw new Error(`Failed to fetch family members: ${res.status}`);
+    return res.json();
+  }
+
+  async addFamilyMember(userId: string, member: Omit<FamilyMember, 'id' | 'userId'>): Promise<FamilyMember> {
+    const res = await fetch(`${BASE_URL}/${userId}/family-members`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(member),
+    });
+    if (!res.ok) throw new Error(`Failed to add family member: ${res.status}`);
+    return res.json();
+  }
+
+  async updateFamilyMember(userId: string, memberId: string, member: Omit<FamilyMember, 'id' | 'userId'>): Promise<FamilyMember> {
+    const res = await fetch(`${BASE_URL}/${userId}/family-members/${memberId}`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(member),
+    });
+    if (!res.ok) throw new Error(`Failed to update family member: ${res.status}`);
+    return res.json();
+  }
+
+  async deleteFamilyMember(userId: string, memberId: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/${userId}/family-members/${memberId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to delete family member: ${res.status}`);
+  }
+
+  /** Upserts the patient-service link for one hospital for this family member —
+   *  mirrors UserService.linkPatientForHospital, scoped to a specific member. */
+  async linkPatientForHospital(userId: string, memberId: string, link: Omit<PatientLink, 'linkedAt'>): Promise<FamilyMember> {
+    const res = await fetch(`${BASE_URL}/${userId}/family-members/${memberId}/patient-links`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(link),
+    });
+    if (!res.ok) throw new Error(`Failed to link patient for hospital: ${res.status}`);
+    return res.json();
+  }
+}
+
+export default new FamilyMemberService();

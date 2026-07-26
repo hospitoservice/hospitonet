@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, useNavigate, useLocation } from 'react-router-dom';
+import React from 'react';
+import { BrowserRouter as Router, Routes, Route, Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { Screen } from './types';
+import UserService from '@/src/service/UserService';
 
 // Import all screens
 import HomeScreen from '@/src/screens/HomeScreen';
@@ -18,16 +19,27 @@ import NotificationScreen from "@/src/screens/NotificationScreen.tsx";
 import OrderScreen from "@/src/screens/OrderScreen.tsx";
 import LabtestScreen from "@/src/screens/LabtestScreen.tsx";
 import AppointmentBookingScreen from "@/src/screens/AppointmentBookingScreen.tsx";
+import AppointmentDetailScreen from "@/src/screens/AppointmentDetailScreen.tsx";
 import CheckoutScreen from '@/src/screens/CheckoutScreen';
+import RaiseComplaintScreen from '@/src/screens/RaiseComplaintScreen';
+import FamilyMembersScreen from '@/src/screens/FamilyMembersScreen';
+import PaymentMethodsScreen from '@/src/screens/PaymentMethodsScreen';
+import SettingsScreen from '@/src/screens/SettingsScreen';
+import BillsScreen from '@/src/screens/BillsScreen';
+import InsuranceScreen from '@/src/screens/InsuranceScreen';
+
+const ProtectedRoute: React.FC<{ element: React.ReactElement }> = ({ element }) => {
+  return UserService.getPhoneFromSession() ? element : <Navigate to="/login" replace />;
+};
 
 const AppContent: React.FC = () => {
-  const [isDarkMode, setIsDarkMode] = useState(false);
   const location = useLocation();
   const navigate = useNavigate();
 
   // Get current screen from path
   const getCurrentScreen = (): Screen => {
     const path = location.pathname.substring(1);
+
     if (path === '') return Screen.HOME;
     return Object.values(Screen).find(screen => 
       screen.toLowerCase() === path.toLowerCase()
@@ -35,15 +47,15 @@ const AppContent: React.FC = () => {
   };
 
   const currentScreen = getCurrentScreen();
-  const showNav = currentScreen !== Screen.LOGIN && currentScreen !== Screen.ASSISTANT && currentScreen !== Screen.VERIFY && currentScreen !== Screen.CHECKOUT;
-
-  useEffect(() => {
-    if (isDarkMode) {
-      document.documentElement.classList.add('dark');
-    } else {
-      document.documentElement.classList.remove('dark');
-    }
-  }, [isDarkMode]);
+  const showNav = currentScreen !== Screen.LOGIN
+    && currentScreen !== Screen.ASSISTANT
+    && currentScreen !== Screen.VERIFY
+    && currentScreen !== Screen.CHECKOUT
+    && !location.pathname.startsWith('/appointment/')
+    && location.pathname !== '/raise-complaint'
+    && location.pathname !== '/family-members'
+    && location.pathname !== '/payment-methods'
+    && location.pathname !== '/insurance';
 
   const handleNavigate = (screen: Screen) => {
     navigate(screen === Screen.HOME ? '/' : `/${screen.toLowerCase()}`);
@@ -57,23 +69,30 @@ const AppContent: React.FC = () => {
 
       <main className="flex-1 overflow-y-auto hide-scrollbar pt-0">
         <Routes>
-          <Route path="/" element={<HomeScreen onNavigate={handleNavigate} />} />
-          <Route path="/home" element={<HomeScreen onNavigate={handleNavigate} />} />
-          <Route path="/hospitonet" element={<HomeScreen onNavigate={handleNavigate} />} />
-          <Route path="/favourites" element={<FavouritesScreen />} />
-          <Route path="/notifications" element={<NotificationScreen />} />
-          <Route path="/profile" element={<ProfileScreen onLogout={() => handleNavigate(Screen.LOGIN)} />} />
-          <Route path="/medicines" element={<MedicinesScreen />} />
-          <Route path="/hospitals" element={<HospitalsScreen />} />
-          <Route path="/records" element={<RecordsScreen />} />
-          <Route path="/assistant" element={<AssistantScreen onBack={() => handleNavigate(Screen.HOME)} />} />
+          <Route path="/" element={<ProtectedRoute element={<HomeScreen onNavigate={handleNavigate} />} />} />
+          <Route path="/home" element={<ProtectedRoute element={<HomeScreen onNavigate={handleNavigate} />} />} />
+          <Route path="/hospitonet" element={<ProtectedRoute element={<HomeScreen onNavigate={handleNavigate} />} />} />
+          <Route path="/favourites" element={<ProtectedRoute element={<FavouritesScreen />} />} />
+          <Route path="/notifications" element={<ProtectedRoute element={<NotificationScreen />} />} />
+          <Route path="/profile" element={<ProtectedRoute element={<ProfileScreen onLogout={() => handleNavigate(Screen.LOGIN)} />} />} />
+          <Route path="/medicines" element={<ProtectedRoute element={<MedicinesScreen />} />} />
+          <Route path="/hospitals" element={<ProtectedRoute element={<HospitalsScreen />} />} />
+          <Route path="/records" element={<ProtectedRoute element={<RecordsScreen />} />} />
+          <Route path="/assistant" element={<ProtectedRoute element={<AssistantScreen onBack={() => handleNavigate(Screen.HOME)} />} />} />
           <Route path="/login" element={<LoginScreen onNavigate={handleNavigate} />} />
           <Route path="/verify" element={<VerifyScreen onNavigate={handleNavigate} />} />
-          <Route path="/orders" element={<OrderScreen />} />
-          <Route path="/lab-tests" element={<LabtestScreen />} />
-          <Route path="/book-appointment" element={<AppointmentBookingScreen />} />
-          <Route path="/checkout" element={<CheckoutScreen />} />
-          
+          <Route path="/orders" element={<ProtectedRoute element={<OrderScreen />} />} />
+          <Route path="/lab-tests" element={<ProtectedRoute element={<LabtestScreen />} />} />
+          <Route path="/book-appointment" element={<ProtectedRoute element={<AppointmentBookingScreen />} />} />
+          <Route path="/appointment/:id" element={<ProtectedRoute element={<AppointmentDetailScreen />} />} />
+          <Route path="/checkout" element={<ProtectedRoute element={<CheckoutScreen />} />} />
+          <Route path="/raise-complaint" element={<ProtectedRoute element={<RaiseComplaintScreen />} />} />
+          <Route path="/family-members" element={<ProtectedRoute element={<FamilyMembersScreen />} />} />
+          <Route path="/payment-methods" element={<ProtectedRoute element={<PaymentMethodsScreen />} />} />
+          <Route path="/insurance" element={<ProtectedRoute element={<InsuranceScreen />} />} />
+          <Route path="/settings" element={<ProtectedRoute element={<SettingsScreen />} />} />
+          <Route path="/bills" element={<ProtectedRoute element={<BillsScreen />} />} />
+
           {/* 404 - Not Found */}
           <Route path="*" element={
             <div className="min-h-screen flex items-center justify-center bg-gray-50 dark:bg-gray-900">
@@ -93,23 +112,12 @@ const AppContent: React.FC = () => {
       </main>
 
       {showNav && (
-        <BottomNav 
-          activeScreen={currentScreen} 
+        <BottomNav
+          activeScreen={currentScreen}
           onNavigate={handleNavigate}
           onOpenAssistant={() => handleNavigate(Screen.ASSISTANT)}
         />
       )}
-
-      {/* Dark Mode Toggle */}
-      {/*{currentScreen !== Screen.LOGIN && (*/}
-      {/*  <button */}
-      {/*    onClick={() => setIsDarkMode(!isDarkMode)}*/}
-      {/*    className="fixed bottom-28 right-4 p-3 rounded-full bg-white dark:bg-gray-800 shadow-lg z-[60] border border-gray-100 dark:border-gray-700 transition-transform active:scale-90"*/}
-      {/*  >*/}
-      {/*    <span className="material-icons-round text-primary block dark:hidden">dark_mode</span>*/}
-      {/*    <span className="material-icons-round text-yellow-400 hidden dark:block">light_mode</span>*/}
-      {/*  </button>*/}
-      {/*)}*/}
 
       <style>{`
         :root {

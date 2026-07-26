@@ -1,6 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Screen, Doctor } from '../../types.ts';
-import {LOCATIONS} from "@/src/resources/Location";
+import { LOCATIONS } from "@/src/resources/Location";
+import LocationService from '../service/LocationService';
+import NotificationService from '../service/NotificationService';
 
 interface HomeScreenProps {
   onNavigate: (screen: Screen) => void;
@@ -12,11 +14,24 @@ const TOP_SPECIALISTS: Doctor[] = [
   { id: '3', name: 'Dr. Emily Chen', specialty: 'Neurologist', hospital: 'Care Hospital', rating: 4.8, image: 'https://picsum.photos/seed/doc3/200/200' },
 ];
 
-const LOCATION = LOCATIONS;
-
 const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
-  const [selectedLocation, setSelectedLocation] = useState(LOCATION[0]);
+  const [locations, setLocations] = useState<string[]>(LOCATIONS);
+  const [selectedLocation, setSelectedLocation] = useState(LOCATIONS[0]);
   const [isLocationMenuOpen, setIsLocationMenuOpen] = useState(false);
+  const [hasUnreadNotifications, setHasUnreadNotifications] = useState(false);
+
+  useEffect(() => {
+    LocationService.getLocations().then(data => {
+      setLocations(data);
+      setSelectedLocation(data[0]);
+    });
+  }, []);
+
+  useEffect(() => {
+    NotificationService.getUnreadCount()
+      .then(count => setHasUnreadNotifications(count > 0))
+      .catch(() => {});
+  }, []);
 
   return (
     <div className="flex flex-col bg-gray-50 dark:bg-gray-900 pt-10 pb-32 min-h-screen">
@@ -52,7 +67,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
                     <div className="px-4 py-2 mb-1">
                       <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Select City</p>
                     </div>
-                    {LOCATION.map((loc) => (
+                    {locations.map((loc) => (
                       <button
                         key={loc}
                         onClick={() => {
@@ -79,9 +94,11 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
 
             <button
                 onClick={() => onNavigate(Screen.NOTIFICATIONS)}
-                className="w-12 h-12 rounded-2xl bg-white dark:bg-gray-800 flex items-center justify-center transition-transform active:scale-90 shadow-sm border border-gray-100 dark:border-gray-700">
+                className="relative w-12 h-12 rounded-2xl bg-white dark:bg-gray-800 flex items-center justify-center transition-transform active:scale-90 shadow-sm border border-gray-100 dark:border-gray-700">
               <span className="material-icons-round text-primary text-2xl">notifications_none</span>
-              <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+              {hasUnreadNotifications && (
+                <span className="absolute top-2.5 right-2.5 w-2 h-2 bg-red-500 rounded-full border-2 border-white dark:border-gray-800"></span>
+              )}
             </button>
           </div>
         </div>
@@ -150,6 +167,7 @@ const HomeScreen: React.FC<HomeScreenProps> = ({ onNavigate }) => {
           {[
             { id: Screen.MEDICINES, label: 'Medicine', icon: 'local_pharmacy' },
             { id: Screen.HOSPITALS, label: 'Appointment', icon: 'calendar_month' },
+            { id: Screen.HOSPITALS, label: 'Family Booking', icon: 'family_restroom' },
             { id: Screen.LABTESTS, label: 'Lab Tests', icon: 'science' },
             { id: Screen.RECORDS, label: 'Records', icon: 'description' },
             { id: Screen.HOME, label: 'Consult', icon: 'videocam' },
