@@ -25,6 +25,8 @@ import RaiseComplaintScreen from '@/src/screens/RaiseComplaintScreen';
 import FamilyMembersScreen from '@/src/screens/FamilyMembersScreen';
 import PaymentMethodsScreen from '@/src/screens/PaymentMethodsScreen';
 import SettingsScreen from '@/src/screens/SettingsScreen';
+import BillsScreen from '@/src/screens/BillsScreen';
+import InsuranceScreen from '@/src/screens/InsuranceScreen';
 
 const ProtectedRoute: React.FC<{ element: React.ReactElement }> = ({ element }) => {
   return UserService.getPhoneFromSession() ? element : <Navigate to="/login" replace />;
@@ -52,7 +54,8 @@ const AppContent: React.FC = () => {
     && !location.pathname.startsWith('/appointment/')
     && location.pathname !== '/raise-complaint'
     && location.pathname !== '/family-members'
-    && location.pathname !== '/payment-methods';
+    && location.pathname !== '/payment-methods'
+    && location.pathname !== '/insurance';
 
   const handleNavigate = (screen: Screen) => {
     navigate(screen === Screen.HOME ? '/' : `/${screen.toLowerCase()}`);
@@ -86,7 +89,9 @@ const AppContent: React.FC = () => {
           <Route path="/raise-complaint" element={<ProtectedRoute element={<RaiseComplaintScreen />} />} />
           <Route path="/family-members" element={<ProtectedRoute element={<FamilyMembersScreen />} />} />
           <Route path="/payment-methods" element={<ProtectedRoute element={<PaymentMethodsScreen />} />} />
+          <Route path="/insurance" element={<ProtectedRoute element={<InsuranceScreen />} />} />
           <Route path="/settings" element={<ProtectedRoute element={<SettingsScreen />} />} />
+          <Route path="/bills" element={<ProtectedRoute element={<BillsScreen />} />} />
 
           {/* 404 - Not Found */}
           <Route path="*" element={

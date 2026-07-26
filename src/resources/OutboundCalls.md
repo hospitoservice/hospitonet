@@ -154,17 +154,15 @@ Proxy paths (relative URLs) are resolved by Vite at runtime via `vite.config.ts`
 
 ---
 
-## 10. Appwrite (External Cloud)
-**Endpoint:** `https://nyc.cloud.appwrite.io/v1`  
-**Project ID:** `6a0cc03700054f6ab4dc`  
-**Source:** `src/service/ImageUploadService.ts`, `src/lib/appwriteConfig.js`
+## 10. Profile Image Store (User Service / GridFS)
+**Source:** `src/service/ImageUploadService.ts`
 
-| SDK Method | Purpose | Caller |
-|------------|---------|--------|
-| `storage.createFile(bucketId, id, file)` | Upload a profile image to the `profile-images` bucket | `uploadProfileImage()` |
-| `storage.getFileView(bucketId, fileId)` | Get the public view URL for an uploaded image | `uploadProfileImage()` |
+| Method | Endpoint | Purpose | Caller |
+|--------|----------|---------|--------|
+| POST | `/api/users/image` | Upload a compressed JPEG, stored via MongoDB GridFS in userdb; returns `{ id, url, name }` | `uploadProfileImage()` |
+| GET | `/api/users/image/{id}` | Stream a stored profile image back | rendered directly as `<img src>` |
 
-**Auth:** SDK uses Appwrite project credentials configured in `appwriteConfig.js`.
+Replaces the previous client-direct-to-Appwrite upload — the image now lives in userdb alongside the rest of the user's profile data instead of a third-party cloud project.
 
 ---
 
@@ -198,5 +196,4 @@ Services **not** behind the Vite proxy (hardcoded absolute URLs):
 - Order Service — `http://localhost:8096`
 - Notification Service (user endpoint) — `http://localhost:8085`
 - Location/Favourites hospital calls — `http://localhost:8100`
-- Appwrite — `https://nyc.cloud.appwrite.io/v1`
 - Google Gemini — managed by `@google/genai` SDK

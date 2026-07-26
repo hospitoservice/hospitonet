@@ -88,20 +88,27 @@ const RecordsScreen: React.FC = () => {
         const user = await UserService.getUserByPhone(phone);
         if (!user) { setPatientIdMissing(true); setLoading(false); return; }
 
-        // Query by both patientId and mobile in parallel, then deduplicate by appointment id.
-        // The mobile query acts as a safety net: if user.patientId is null (linkPatient never
-        // ran or failed), or if it points to a newer patient record while old appointments
-        // live under a prior patientId, the mobile query still surfaces them all.
-        const [byId, byMobile] = await Promise.all([
-          user.patientId
-            ? AppointmentService.getAppointmentsByPatientId(user.patientId).catch(() => [] as BookedAppointment[])
-            : Promise.resolve([] as BookedAppointment[]),
+        // Patient records are scoped per hospital, so this user may have a different
+        // patientId at each hospital they've visited — query all of them in parallel,
+        // plus the legacy single patientId and mobile number as safety nets (mobile
+        // catches anything created before a link existed, or under a stale patientId).
+        const linkedPatientIds = new Set(
+          (user.patientLinks ?? []).map(l => l.patientId).filter(Boolean)
+        );
+        if (user.patientId) linkedPatientIds.add(user.patientId);
+
+        const [byPatientIds, byMobile] = await Promise.all([
+          Promise.all(
+            [...linkedPatientIds].map(id =>
+              AppointmentService.getAppointmentsByPatientId(id).catch(() => [] as BookedAppointment[])
+            )
+          ),
           AppointmentService.getAppointmentsByMobile(phone).catch(() => [] as BookedAppointment[]),
         ]);
 
         const seen = new Set<string>();
         const merged: BookedAppointment[] = [];
-        for (const appt of [...byId, ...byMobile]) {
+        for (const appt of [...byPatientIds.flat(), ...byMobile]) {
           if (!seen.has(appt.id)) { seen.add(appt.id); merged.push(appt); }
         }
         merged.sort((a, b) => (b.appointmentDate ?? '').localeCompare(a.appointmentDate ?? ''));

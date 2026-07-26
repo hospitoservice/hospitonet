@@ -30,6 +30,7 @@ function formatTime(slot?: string): string {
 const STATUS_STYLE: Record<string, { pill: string; dot: string; label: string }> = {
   Scheduled:    { pill: 'bg-blue-50 text-blue-600 border border-blue-100',   dot: 'bg-blue-500',   label: 'Scheduled' },
   Confirmed:    { pill: 'bg-blue-50 text-blue-600 border border-blue-100',   dot: 'bg-blue-500',   label: 'Confirmed' },
+  Pending:      { pill: 'bg-orange-50 text-orange-600 border border-orange-100', dot: 'bg-orange-500', label: 'Pending Payment' },
   'In Progress':{ pill: 'bg-amber-50 text-amber-600 border border-amber-100',dot: 'bg-amber-500',  label: 'In Progress' },
   Completed:    { pill: 'bg-green-50 text-green-600 border border-green-100',dot: 'bg-green-500',  label: 'Completed' },
   Cancelled:    { pill: 'bg-red-50 text-red-600 border border-red-100',      dot: 'bg-red-500',    label: 'Cancelled' },
@@ -453,7 +454,7 @@ const AppointmentDetailScreen: React.FC = () => {
   const apptDate = new Date(appt.appointmentDate + 'T00:00:00');
   const isPast = apptDate < today;
 
-  const isUpcomingStatus = appt.status === 'Scheduled' || appt.status === 'Confirmed';
+  const isUpcomingStatus = appt.status === 'Scheduled' || appt.status === 'Confirmed' || appt.status === 'Pending';
 
   const canCancel = isUpcomingStatus && !isPast;
   const canDelete = isPast || appt.status === 'Completed' || appt.status === 'Cancelled';

@@ -10,6 +10,7 @@ import {
 import AppointmentService, { AppointmentInput } from '../service/AppointmentService';
 import DepartmentService from '../service/DepartmentService';
 import UserService, { UserProfile } from '../service/UserService';
+import FamilyMemberService, { FamilyMember } from '../service/FamilyMemberService';
 import { ensurePatientForHospital } from '../service/PatientService';
 
 // ── Helper ────────────────────────────────────────────────────────────────────
@@ -68,10 +69,18 @@ const AppointmentBookingScreen: React.FC = () => {
     // ── Logged-in user ─────────────────────────────────────────────────────────
     const [currentUser, setCurrentUser]     = useState<UserProfile | null>(null);
 
+    // ── Booking for: self or a family member ─────────────────────────────────
+    const [familyMembers, setFamilyMembers] = useState<FamilyMember[]>([]);
+    const [bookingFor, setBookingFor]       = useState<string>('self');
+
     // ── Submission state ───────────────────────────────────────────────────────
     const [showConfirmation, setShowConfirmation] = useState(false);
     const [isSubmitting, setIsSubmitting]   = useState(false);
     const [error, setError]                 = useState<string | null>(null);
+
+    // ── Payment choice ─────────────────────────────────────────────────────────
+    const [showPaymentChoice, setShowPaymentChoice] = useState(false);
+    const [pendingAppointment, setPendingAppointment] = useState<AppointmentInput | null>(null);
 
     // ── Step 1: default date + fetch departments + load logged-in user ──────────
     useEffect(() => {
@@ -104,6 +113,43 @@ const AppointmentBookingScreen: React.FC = () => {
             .catch(() => setDepartments([]))
             .finally(() => setLoadingDepts(false));
     }, [hospital?.hospitalId, hospital?.id]);
+
+    // ── Step 1b: once the logged-in user is known, load their family members ────
+    useEffect(() => {
+        if (!currentUser?.id) return;
+        FamilyMemberService.getFamilyMembers(currentUser.id)
+            .then(setFamilyMembers)
+            .catch(() => setFamilyMembers([]));
+    }, [currentUser?.id]);
+
+    const selectedFamilyMember = bookingFor !== 'self' ? familyMembers.find(m => m.id === bookingFor) ?? null : null;
+    const familyMemberIncomplete = !!selectedFamilyMember
+        && (!selectedFamilyMember.mobile || !selectedFamilyMember.dateOfBirth || !selectedFamilyMember.gender);
+
+    const handleSelectBookingFor = (value: string) => {
+        setBookingFor(value);
+        if (value === 'self') {
+            setFormData(prev => ({
+                ...prev,
+                patientName: currentUser ? [currentUser.firstName, currentUser.lastName].filter(Boolean).join(' ') : prev.patientName,
+                gender:      currentUser?.gender      ?? '',
+                dob:         currentUser?.dateOfBirth ?? '',
+                phoneNumber: currentUser?.phone       ?? '',
+                email:       currentUser?.email       ?? '',
+            }));
+            return;
+        }
+        const member = familyMembers.find(m => m.id === value);
+        if (!member) return;
+        setFormData(prev => ({
+            ...prev,
+            patientName: [member.firstName, member.lastName].filter(Boolean).join(' '),
+            gender:      member.gender ?? '',
+            dob:         member.dateOfBirth ?? '',
+            phoneNumber: member.mobile ?? '',
+            email:       member.email || currentUser?.email || '',
+        }));
+    };
 
     // ── Step 2: fetch doctors when department changes ──────────────────────────
     const fetchDoctors = useCallback(async (deptId: string) => {
@@ -177,6 +223,7 @@ const AppointmentBookingScreen: React.FC = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!selectedSlot) { setError('Please select a time slot.'); return; }
+        if (familyMemberIncomplete) { setError('Please complete this family member\'s profile before booking.'); return; }
         setIsSubmitting(true);
         setError(null);
 
@@ -185,34 +232,80 @@ const AppointmentBookingScreen: React.FC = () => {
             const patientFirstName = nameParts[0] ?? '';
             const patientLastName  = nameParts.slice(1).join(' ') ?? '';
 
-            // Build a user profile from current form data (fallback if not logged in)
-            const userForPatient: UserProfile = currentUser ?? {
-                firstName:   patientFirstName,
-                lastName:    patientLastName,
-                phone:       formData.phoneNumber,
-                email:       formData.email,
-                dateOfBirth: formData.dob,
-                gender:      formData.gender,
-            };
+            const hospitalId = hospital?.hospitalId ?? hospital?.id ?? '';
+            let patientId: string;
 
-            // Resolve or create a patient record.  Use the formatted hospitalId ("H00012")
-            // so the lookup key is stable; the global fallback inside ensurePatientForHospital
-            // handles users whose prior record was created with a different format.
-            const patientRecord = await ensurePatientForHospital(
-                userForPatient,
-                hospital?.hospitalId ?? hospital?.id ?? '',
-            );
-            const patientId = patientRecord.patientId;
+            if (selectedFamilyMember) {
+                // Same per-hospital fast path as the self-booking case below, scoped to
+                // this family member's own link list.
+                const existingMemberLink = selectedFamilyMember.patientLinks?.find(l => l.hospitalId === hospitalId);
 
-            // Keep user.patientId pointing to the resolved patient record.
-            // Awaited so the link is committed before we show the confirmation,
-            // ensuring RecordsScreen can find appointments on the next visit.
-            if (currentUser?.id && patientRecord.patientId) {
-                try {
-                    const updated = await UserService.linkPatient(currentUser.id, patientRecord.patientId);
-                    setCurrentUser(updated);
-                } catch (err) {
-                    console.warn('Failed to link patient to user:', err);
+                if (existingMemberLink) {
+                    patientId = existingMemberLink.patientId;
+                } else {
+                    // A distinct synthetic id (never currentUser.id) so this family member's
+                    // patient record can never collide with the account holder's own record —
+                    // ensurePatientForHospital's userId-based lookup keys off this.
+                    const memberProfile: UserProfile = {
+                        id:          currentUser?.id ? `${currentUser.id}_fam_${selectedFamilyMember.id}` : undefined,
+                        firstName:   selectedFamilyMember.firstName,
+                        lastName:    selectedFamilyMember.lastName,
+                        phone:       selectedFamilyMember.mobile,
+                        email:       selectedFamilyMember.email || currentUser?.email || formData.email,
+                        dateOfBirth: selectedFamilyMember.dateOfBirth,
+                        gender:      selectedFamilyMember.gender,
+                    };
+                    const record = await ensurePatientForHospital(memberProfile, hospitalId);
+                    patientId = record.patientId;
+
+                    if (currentUser?.id && selectedFamilyMember.id) {
+                        try {
+                            const updatedMember = await FamilyMemberService.linkPatientForHospital(currentUser.id, selectedFamilyMember.id, {
+                                hospitalId,
+                                hospitalName: hospital?.name,
+                                patientId,
+                            });
+                            setFamilyMembers(prev => prev.map(m => m.id === updatedMember.id ? updatedMember : m));
+                        } catch (err) {
+                            console.warn('Failed to link patient to family member:', err);
+                        }
+                    }
+                }
+            } else {
+                // Build a user profile from current form data (fallback if not logged in)
+                const userForPatient: UserProfile = currentUser ?? {
+                    firstName:   patientFirstName,
+                    lastName:    patientLastName,
+                    phone:       formData.phoneNumber,
+                    email:       formData.email,
+                    dateOfBirth: formData.dob,
+                    gender:      formData.gender,
+                };
+
+                // Patient records are scoped per hospital, so check whether this user
+                // already has a link for THIS hospital before doing any lookup — avoids
+                // ensurePatientForHospital's multi-round-trip search entirely on repeat visits.
+                const existingLink = currentUser?.patientLinks?.find(l => l.hospitalId === hospitalId);
+
+                const patientRecord = existingLink
+                    ? { patientId: existingLink.patientId }
+                    : await ensurePatientForHospital(userForPatient, hospitalId);
+                patientId = patientRecord.patientId;
+
+                // Keep the per-hospital link (and the legacy single patientId pointer) up to
+                // date. Awaited so it's committed before we show the confirmation, ensuring
+                // RecordsScreen can find appointments on the next visit.
+                if (currentUser?.id && patientId && !existingLink) {
+                    try {
+                        const updated = await UserService.linkPatientForHospital(currentUser.id, {
+                            hospitalId,
+                            hospitalName: hospital?.name,
+                            patientId,
+                        });
+                        setCurrentUser(updated);
+                    } catch (err) {
+                        console.warn('Failed to link patient to user:', err);
+                    }
                 }
             }
 
@@ -246,16 +339,51 @@ const AppointmentBookingScreen: React.FC = () => {
                     : undefined,
             };
 
-            const appointment = await AppointmentService.createAppointment(appointmentInput);
+            setPendingAppointment(appointmentInput);
+            setShowPaymentChoice(true);
+        } catch (err) {
+            console.error('Error preparing appointment:', err);
+            setError('Failed to prepare appointment. Please try again.');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
 
+    // ── Payment choice handlers ────────────────────────────────────────────────
+    const handlePayAtHospital = async () => {
+        if (!pendingAppointment) return;
+        setIsSubmitting(true);
+        setError(null);
+        try {
+            await AppointmentService.createAppointment({ ...pendingAppointment, status: 'Pending' });
+            setShowPaymentChoice(false);
             setShowConfirmation(true);
             setTimeout(() => navigate('/'), 2500);
         } catch (err) {
             console.error('Error creating appointment:', err);
             setError('Failed to book appointment. Please try again.');
+            setShowPaymentChoice(false);
         } finally {
             setIsSubmitting(false);
         }
+    };
+
+    const handlePayNow = () => {
+        if (!pendingAppointment) return;
+        setShowPaymentChoice(false);
+        navigate('/checkout', {
+            state: {
+                appointmentPayment: {
+                    appointmentInput: pendingAppointment,
+                    amount: pendingAppointment.doctorFees ?? 500,
+                    doctorName: selectedDoctor?.fullName,
+                    department: selectedDept?.name,
+                    hospitalName: hospital?.name,
+                    date: formData.date,
+                    time: selectedSlot ? fmt24(selectedSlot.startTime) : undefined,
+                },
+            },
+        });
     };
 
     // ── Render ─────────────────────────────────────────────────────────────────
@@ -419,6 +547,53 @@ const AppointmentBookingScreen: React.FC = () => {
                         </div>
                     )}
 
+                    {/* ── Booking For ──────────────────────────────────────── */}
+                    {familyMembers.length > 0 && (
+                        <div className="pt-2">
+                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                Booking For
+                            </label>
+                            <div className="flex gap-2 overflow-x-auto pb-1">
+                                <button
+                                    type="button"
+                                    onClick={() => handleSelectBookingFor('self')}
+                                    className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                                        bookingFor === 'self'
+                                            ? 'bg-primary text-white shadow-md shadow-primary/20'
+                                            : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                    }`}
+                                >
+                                    Myself
+                                </button>
+                                {familyMembers.map(member => (
+                                    <button
+                                        key={member.id}
+                                        type="button"
+                                        onClick={() => member.id && handleSelectBookingFor(member.id)}
+                                        className={`flex-shrink-0 px-4 py-2.5 rounded-xl text-xs font-bold transition-all ${
+                                            bookingFor === member.id
+                                                ? 'bg-primary text-white shadow-md shadow-primary/20'
+                                                : 'bg-white dark:bg-gray-800 text-gray-600 dark:text-gray-300 border border-gray-200 dark:border-gray-700'
+                                        }`}
+                                    >
+                                        {member.firstName}{member.relation ? ` (${member.relation})` : ''}
+                                    </button>
+                                ))}
+                            </div>
+                            {familyMemberIncomplete && (
+                                <div className="mt-3 flex items-start gap-2 bg-amber-50 dark:bg-amber-900/20 border border-amber-100 dark:border-amber-800 rounded-xl p-3">
+                                    <span className="material-icons-round text-amber-500 text-lg">info</span>
+                                    <p className="text-xs text-amber-700 dark:text-amber-300 leading-relaxed">
+                                        Add a mobile number, date of birth, and gender for {selectedFamilyMember?.firstName} before booking on their behalf.{' '}
+                                        <button type="button" onClick={() => navigate('/family-members')} className="font-bold underline">
+                                            Update now
+                                        </button>
+                                    </p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
                     {/* ── Patient Details ─────────────────────────────────── */}
                     <div className="pt-4 border-t border-gray-200 dark:border-gray-700">
                         <h3 className="text-base font-semibold text-gray-900 dark:text-white mb-3">Patient Details</h3>
@@ -548,13 +723,64 @@ const AppointmentBookingScreen: React.FC = () => {
                     {/* ── Submit ───────────────────────────────────────────── */}
                     <button
                         type="submit"
-                        disabled={isSubmitting || !selectedSlot}
+                        disabled={isSubmitting || !selectedSlot || familyMemberIncomplete}
                         className="w-full mt-2 bg-primary hover:bg-primary-dark text-white font-bold py-3.5 px-6 rounded-xl shadow-md hover:shadow-lg transition-all disabled:opacity-50 disabled:cursor-not-allowed"
                     >
                         {isSubmitting ? 'Booking…' : 'Confirm Appointment'}
                     </button>
                 </form>
             </div>
+
+            {/* ── Payment choice modal ──────────────────────────────────────── */}
+            {showPaymentChoice && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm px-4">
+                    <div className="bg-white dark:bg-gray-800 rounded-3xl p-6 max-w-sm w-full shadow-2xl">
+                        <div className="flex items-center justify-between mb-1">
+                            <h3 className="text-lg font-black text-gray-900 dark:text-white">Choose Payment Option</h3>
+                            <button
+                                onClick={() => setShowPaymentChoice(false)}
+                                className="p-1 rounded-full hover:bg-gray-100 dark:hover:bg-gray-700"
+                            >
+                                <span className="material-icons-round text-gray-400">close</span>
+                            </button>
+                        </div>
+                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-5">How would you like to pay the consultation fee?</p>
+
+                        <div className="space-y-3">
+                            <button
+                                onClick={handlePayNow}
+                                className="w-full flex items-center gap-3 p-4 bg-cyan-50 dark:bg-cyan-900/20 rounded-2xl hover:bg-cyan-100 dark:hover:bg-cyan-900/30 transition-colors"
+                            >
+                                <div className="w-10 h-10 rounded-xl bg-cyan-100 dark:bg-cyan-800 flex items-center justify-center flex-shrink-0">
+                                    <span className="material-icons-round text-cyan-600 dark:text-cyan-300">payment</span>
+                                </div>
+                                <div className="text-left flex-1">
+                                    <h4 className="font-bold text-sm text-gray-900 dark:text-white">Pay Now</h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Pay online via UPI or Card</p>
+                                </div>
+                                <span className="material-icons-round text-gray-400">chevron_right</span>
+                            </button>
+
+                            <button
+                                onClick={handlePayAtHospital}
+                                disabled={isSubmitting}
+                                className="w-full flex items-center gap-3 p-4 bg-orange-50 dark:bg-orange-900/20 rounded-2xl hover:bg-orange-100 dark:hover:bg-orange-900/30 transition-colors disabled:opacity-60"
+                            >
+                                <div className="w-10 h-10 rounded-xl bg-orange-100 dark:bg-orange-800 flex items-center justify-center flex-shrink-0">
+                                    <span className="material-icons-round text-orange-600 dark:text-orange-300">local_hospital</span>
+                                </div>
+                                <div className="text-left flex-1">
+                                    <h4 className="font-bold text-sm text-gray-900 dark:text-white">Pay at Hospital</h4>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400">Settle payment during your visit</p>
+                                </div>
+                                {isSubmitting
+                                    ? <span className="w-4 h-4 border-2 border-gray-300 border-t-orange-500 rounded-full animate-spin" />
+                                    : <span className="material-icons-round text-gray-400">chevron_right</span>}
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
 
             {/* ── Confirmation overlay ──────────────────────────────────────── */}
             <AnimatePresence>

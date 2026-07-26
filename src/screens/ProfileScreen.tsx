@@ -77,6 +77,7 @@ function calculateAge(dob: string): number {
 const STATUS_STYLE: Record<string, { pill: string; dot: string }> = {
   Scheduled:     { pill: 'bg-blue-50 text-blue-600',   dot: 'bg-blue-500' },
   Confirmed:     { pill: 'bg-blue-50 text-blue-600',   dot: 'bg-blue-500' },
+  Pending:       { pill: 'bg-orange-50 text-orange-600', dot: 'bg-orange-500' },
   'In Progress': { pill: 'bg-amber-50 text-amber-600', dot: 'bg-amber-500' },
   Completed:     { pill: 'bg-green-50 text-green-600', dot: 'bg-green-500' },
   Cancelled:     { pill: 'bg-red-50 text-red-600',     dot: 'bg-red-500' },
@@ -124,8 +125,8 @@ const Field: React.FC<{
       maxLength={maxLength}
       className={`w-full px-4 py-3 rounded-2xl border text-sm font-medium outline-none transition-all
         ${readOnly
-          ? 'bg-gray-50 text-gray-400 border-gray-100 cursor-not-allowed'
-          : 'bg-white text-gray-800 border-gray-200 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100'
+          ? 'bg-gray-50 dark:bg-gray-900 text-gray-400 dark:text-gray-500 border-gray-100 dark:border-gray-700 cursor-not-allowed'
+          : 'bg-white dark:bg-gray-900 text-gray-800 dark:text-gray-100 border-gray-200 dark:border-gray-600 focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 dark:focus:ring-cyan-900/30'
         }`}
     />
   </div>
@@ -139,7 +140,7 @@ const SelectField: React.FC<{
     <select
       value={value}
       onChange={e => onChange(e.target.value)}
-      className="w-full px-4 py-3 rounded-2xl border border-gray-200 bg-white text-sm font-medium text-gray-800 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 appearance-none transition-all"
+      className="w-full px-4 py-3 rounded-2xl border border-gray-200 dark:border-gray-600 bg-white dark:bg-gray-900 text-sm font-medium text-gray-800 dark:text-gray-100 outline-none focus:border-cyan-400 focus:ring-2 focus:ring-cyan-100 dark:focus:ring-cyan-900/30 appearance-none transition-all"
     >
       <option value="">— Select —</option>
       {options.map(o => <option key={o} value={o}>{o}</option>)}
@@ -150,7 +151,7 @@ const SelectField: React.FC<{
 const SectionHeader: React.FC<{ icon: string; title: string }> = ({ icon, title }) => (
   <div className="flex items-center gap-2 mb-3 mt-6">
     <span className="material-icons-round text-primary text-lg">{icon}</span>
-    <h4 className="text-xs font-black text-gray-500 uppercase tracking-widest">{title}</h4>
+    <h4 className="text-xs font-black text-gray-500 dark:text-gray-400 uppercase tracking-widest">{title}</h4>
   </div>
 );
 
@@ -259,7 +260,9 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
   const [saveError,     setSaveError]     = useState<string | null>(null);
   const [saveSuccess,   setSaveSuccess]   = useState(false);
   const [photoUploading, setPhotoUploading] = useState(false);
+  const [showPhotoOptions, setShowPhotoOptions] = useState(false);
   const photoInputRef = useRef<HTMLInputElement>(null);
+  const galleryInputRef = useRef<HTMLInputElement>(null);
 
   const [showHelpModal, setShowHelpModal] = useState(false);
 
@@ -412,6 +415,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
       setPhotoUploading(false);
       // Reset so the same file can be picked again if needed
       if (photoInputRef.current) photoInputRef.current.value = '';
+      if (galleryInputRef.current) galleryInputRef.current.value = '';
     }
   };
 
@@ -492,7 +496,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
   };
 
   // ── Derived ───────────────────────────────────────────────────────────────────
-  const upcomingAppts = appointments.filter(a => a.status === 'Scheduled' || a.status === 'Confirmed' || a.status === 'In Progress');
+  const upcomingAppts = appointments.filter(a => a.status === 'Scheduled' || a.status === 'Confirmed' || a.status === 'In Progress' || a.status === 'Pending');
   const pastAppts     = appointments.filter(a => a.status === 'Completed'  || a.status === 'Cancelled');
   const displayed     = activeTab === 'upcoming' ? upcomingAppts : pastAppts;
 
@@ -501,11 +505,13 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
     : 'Guest User';
 
   const menuItems = [
-    { icon: 'calendar_today', label: 'My Appointments', color: 'text-blue-500',   action: handleOpenAppointments },
+    { icon: 'calendar_today', label: 'Appointments', color: 'text-blue-500',   action: handleOpenAppointments },
     { icon: 'shopping_bag',   label: 'Orders',          color: 'text-red-500',    action: () => navigate('/orders') },
-    { icon: 'report',         label: 'My Complaints',   color: 'text-orange-500', action: handleOpenComplaints },
+    { icon: 'report',         label: 'Complaints',   color: 'text-orange-500', action: handleOpenComplaints },
     { icon: 'people',         label: 'Family Members',  color: 'text-purple-500', action: () => navigate('/family-members') },
     { icon: 'payment',        label: 'Payment Methods', color: 'text-green-500',  action: () => navigate('/payment-methods') },
+    { icon: 'health_and_safety', label: 'Insurance',   color: 'text-blue-500',   action: () => navigate('/insurance') },
+    { icon: 'receipt_long',   label: 'Bills & Receipts', color: 'text-teal-500',  action: () => navigate('/bills') },
     { icon: 'help_outline',   label: 'Help & Support',  color: 'text-cyan-500',   action: () => setShowHelpModal(true) },
     { icon: 'settings',       label: 'App Settings',    color: 'text-gray-500',   action: () => navigate('/settings') },
   ];
@@ -639,7 +645,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
     const previewBmi = computeBmi(form.height, form.weight);
 
     return (
-      <div className="flex flex-col min-h-screen bg-gray-50 pb-28">
+      <div className="flex flex-col min-h-screen bg-gray-50 dark:bg-gray-900 pb-28">
         {/* Header */}
         <header className="bg-gradient-to-r from-cyan-500 to-blue-600 pt-14 pb-6 px-6 rounded-b-[3rem] shadow-xl text-white">
           <div className="flex items-center justify-between">
@@ -663,19 +669,19 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
 
           {/* Feedback banners */}
           {saveError && (
-            <div className="bg-red-50 border border-red-100 rounded-2xl px-4 py-3 flex items-center gap-2 mb-2">
+            <div className="bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-2xl px-4 py-3 flex items-center gap-2 mb-2">
               <span className="material-icons-round text-red-500 text-base">error_outline</span>
-              <p className="text-xs text-red-600 font-bold">{saveError}</p>
+              <p className="text-xs text-red-600 dark:text-red-400 font-bold">{saveError}</p>
             </div>
           )}
 
           {/* Profile photo */}
           <div className="flex flex-col items-center py-4">
             <div className="relative">
-              <div className="w-24 h-24 rounded-[2rem] bg-gray-200 overflow-hidden shadow-lg">
+              <div className="w-24 h-24 rounded-[2rem] bg-gray-200 dark:bg-gray-700 overflow-hidden shadow-lg">
                 {photoUploading ? (
-                  <div className="w-full h-full flex items-center justify-center bg-gray-100">
-                    <span className="w-6 h-6 border-2 border-gray-300 border-t-primary rounded-full animate-spin" />
+                  <div className="w-full h-full flex items-center justify-center bg-gray-100 dark:bg-gray-800">
+                    <span className="w-6 h-6 border-2 border-gray-300 dark:border-gray-600 border-t-primary rounded-full animate-spin" />
                   </div>
                 ) : (
                   <img
@@ -686,7 +692,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
                 )}
               </div>
               <button
-                onClick={() => photoInputRef.current?.click()}
+                onClick={() => setShowPhotoOptions(true)}
                 disabled={photoUploading}
                 className="absolute -bottom-2 -right-2 w-9 h-9 bg-primary text-white rounded-2xl flex items-center justify-center shadow-lg border-2 border-white active:scale-90 transition-all"
               >
@@ -702,10 +708,59 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
               className="hidden"
               onChange={handlePhotoChange}
             />
+            <input
+              ref={galleryInputRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={handlePhotoChange}
+            />
           </div>
 
+          {/* Photo source picker */}
+          {showPhotoOptions && (
+            <div
+              className="fixed inset-0 z-50 flex items-end justify-center bg-black/40 backdrop-blur-sm"
+              onClick={() => setShowPhotoOptions(false)}
+            >
+              <div
+                className="w-full max-w-sm bg-white dark:bg-gray-800 rounded-t-3xl p-5 pb-8 shadow-2xl"
+                onClick={e => e.stopPropagation()}
+              >
+                <div className="w-10 h-1 bg-gray-200 dark:bg-gray-600 rounded-full mx-auto mb-5" />
+                <h3 className="text-sm font-black text-gray-900 dark:text-white text-center mb-4">Update Profile Photo</h3>
+                <div className="space-y-2.5">
+                  <button
+                    onClick={() => { setShowPhotoOptions(false); photoInputRef.current?.click(); }}
+                    className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-cyan-50 dark:bg-cyan-900/30 flex items-center justify-center flex-shrink-0">
+                      <span className="material-icons-round text-cyan-500">camera_alt</span>
+                    </div>
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-200">Take Photo</span>
+                  </button>
+                  <button
+                    onClick={() => { setShowPhotoOptions(false); galleryInputRef.current?.click(); }}
+                    className="w-full flex items-center gap-3 p-4 bg-gray-50 dark:bg-gray-900 rounded-2xl hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors"
+                  >
+                    <div className="w-10 h-10 rounded-xl bg-purple-50 dark:bg-purple-900/30 flex items-center justify-center flex-shrink-0">
+                      <span className="material-icons-round text-purple-500">photo_library</span>
+                    </div>
+                    <span className="text-sm font-bold text-gray-700 dark:text-gray-200">Choose from Gallery</span>
+                  </button>
+                </div>
+                <button
+                  onClick={() => setShowPhotoOptions(false)}
+                  className="w-full mt-4 py-3.5 rounded-2xl bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-black text-xs uppercase tracking-widest"
+                >
+                  Cancel
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* ── Personal Info ─────────────────────────────────────── */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
             <SectionHeader icon="person" title="Personal Info" />
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">
@@ -724,7 +779,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
           </div>
 
           {/* ── Health Stats ──────────────────────────────────────── */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
             <SectionHeader icon="monitor_heart" title="Health Stats" />
             <div className="space-y-4">
               <SelectField label="Blood Group" value={form.bloodGroup} onChange={v => setF('bloodGroup', v)} options={BLOOD_GROUPS} />
@@ -733,7 +788,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
                 <Field label="Weight (kg)" value={form.weight} onChange={v => setF('weight', v)} type="number" placeholder="e.g. 65" />
                 <div>
                   <label className="block text-[10px] font-black text-gray-400 uppercase tracking-widest mb-1">BMI</label>
-                  <div className="w-full px-4 py-3 rounded-2xl border border-gray-100 bg-gray-50 text-sm font-black text-center text-gray-500">
+                  <div className="w-full px-4 py-3 rounded-2xl border border-gray-100 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 text-sm font-black text-center text-gray-500 dark:text-gray-400">
                     {previewBmi || '—'}
                   </div>
                   {previewBmi && (
@@ -746,7 +801,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
           </div>
 
           {/* ── Address ───────────────────────────────────────────── */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
             <SectionHeader icon="location_on" title="Address" />
             <div className="space-y-4">
               <Field label="Address Line" value={form.location.address} onChange={v => setLoc('address', v)} placeholder="House/Flat, Street" />
@@ -759,7 +814,7 @@ const ProfileScreen: React.FC<ProfileScreenProps> = ({ onLogout }) => {
           </div>
 
           {/* ── Emergency Contact ─────────────────────────────────── */}
-          <div className="bg-white rounded-3xl shadow-sm border border-gray-100 p-5">
+          <div className="bg-white dark:bg-gray-800 rounded-3xl shadow-sm border border-gray-100 dark:border-gray-700 p-5">
             <SectionHeader icon="emergency" title="Emergency Contact" />
             <div className="space-y-4">
               <div className="grid grid-cols-2 gap-3">

@@ -6,6 +6,7 @@ export interface ComplaintRequest {
   hospitalId?: string;
   userId: string;
   patientId?: string;
+  patientMobile?: string;
   appointmentId?: string;
   subject: string;
   against: string;

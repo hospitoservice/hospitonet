@@ -2,6 +2,8 @@ import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Hospital } from '../../types.ts';
 import HospitalService from '../service/HospitalService.ts';
+import UserService from '../service/UserService';
+import FavouritesService from '../service/FavouritesService';
 
 const FILTERS = ['Recommended', 'Near Me', 'Top Rated', '24/7 Open'];
 
@@ -34,6 +36,45 @@ const HospitalsScreen: React.FC = () => {
     const [isSearching, setIsSearching] = useState(false);
     const navigate = useNavigate();
     const searchDebounce = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const [userId, setUserId] = useState<string | null>(null);
+    const [favourites, setFavourites] = useState<Set<string>>(new Set());
+    const [favouritesBusy, setFavouritesBusy] = useState<Set<string>>(new Set());
+
+    useEffect(() => {
+        FavouritesService.getFavouriteRefIds('HOSPITAL').then(setFavourites);
+        const phone = UserService.getPhoneFromSession();
+        if (!phone) return;
+        UserService.getUserByPhone(phone).then(user => { if (user?.id) setUserId(user.id); }).catch(() => {});
+    }, []);
+
+    const toggleFavourite = async (hosp: Hospital) => {
+        if (!userId || favouritesBusy.has(hosp.id)) return;
+        const isFav = favourites.has(hosp.id);
+
+        setFavouritesBusy(prev => new Set(prev).add(hosp.id));
+        try {
+            if (isFav) {
+                await FavouritesService.removeFavourite(userId, 'HOSPITAL', hosp.id);
+                setFavourites(prev => { const next = new Set(prev); next.delete(hosp.id); return next; });
+            } else {
+                await FavouritesService.addFavourite(userId, {
+                    favouriteType: 'HOSPITAL',
+                    refId: hosp.id,
+                    name: hosp.name,
+                    image: hosp.image,
+                    subtitle: hosp.location,
+                    rating: hosp.rating,
+                    tags: hosp.tags,
+                });
+                setFavourites(prev => new Set(prev).add(hosp.id));
+            }
+        } catch (err) {
+            console.error('Failed to update favourite:', err);
+        } finally {
+            setFavouritesBusy(prev => { const next = new Set(prev); next.delete(hosp.id); return next; });
+        }
+    };
 
     const fetchHospitals = useCallback(async (filter: string) => {
         setLoading(true);
@@ -208,6 +249,15 @@ const HospitalsScreen: React.FC = () => {
                                 <div className="absolute top-2 left-2 bg-white/90 dark:bg-black/70 px-2 py-0.5 rounded-lg text-[10px] font-black text-primary flex items-center shadow-md backdrop-blur-sm">
                                     <span className="material-icons text-xs mr-1 text-yellow-500">star</span> {hosp.rating}
                                 </div>
+                                <button
+                                    onClick={(e) => { e.stopPropagation(); toggleFavourite(hosp); }}
+                                    disabled={favouritesBusy.has(hosp.id)}
+                                    className="absolute top-2 right-2 w-6 h-6 rounded-full bg-white/90 dark:bg-black/70 backdrop-blur-sm flex items-center justify-center shadow-md transition-all active:scale-90 disabled:opacity-60"
+                                >
+                                    <span className={`material-icons-round text-sm ${favourites.has(hosp.id) ? 'text-red-500' : 'text-gray-400'}`}>
+                                        {favourites.has(hosp.id) ? 'favorite' : 'favorite_border'}
+                                    </span>
+                                </button>
                             </div>
                             <div className="flex-1 flex flex-col justify-between py-1">
                                 <div>

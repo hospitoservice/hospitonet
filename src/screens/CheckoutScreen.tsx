@@ -1,5 +1,8 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
+import AppointmentService, { AppointmentInput } from '../service/AppointmentService';
+import UserService, { PaymentMethod as SavedPaymentMethod } from '../service/UserService';
+import OrderService from '../service/OrderService';
 
 interface CartItem {
   id: string;
@@ -9,21 +12,106 @@ interface CartItem {
   quantity: number;
 }
 
-type PaymentMethod = 'upi' | 'card' | 'cod';
+interface AppointmentPaymentInfo {
+  appointmentInput: AppointmentInput;
+  amount: number;
+  doctorName?: string;
+  department?: string;
+  hospitalName?: string;
+  date?: string;
+  time?: string;
+}
+
+type PaymentMethod = 'upi' | 'card' | 'cod' | 'saved';
 
 const CheckoutScreen: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
-  const { cart = [], total = 0 } = (location.state as { cart: CartItem[]; total: number }) ?? {};
+  const { cart = [], total: cartTotal = 0, appointmentPayment } = (location.state as {
+    cart?: CartItem[];
+    total?: number;
+    appointmentPayment?: AppointmentPaymentInfo;
+  }) ?? {};
+
+  const isAppointment = !!appointmentPayment;
+  const total = isAppointment ? (appointmentPayment?.amount ?? 0) : cartTotal;
 
   const [method, setMethod] = useState<PaymentMethod>('upi');
   const [upiId, setUpiId] = useState('');
   const [card, setCard] = useState({ number: '', expiry: '', cvv: '', name: '' });
   const [orderPlaced, setOrderPlaced] = useState(false);
   const [summaryOpen, setSummaryOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState<string | null>(null);
 
-  const deliveryFee = total > 500 ? 0 : 40;
+  const [savedMethods, setSavedMethods] = useState<SavedPaymentMethod[]>([]);
+  const [selectedSavedId, setSelectedSavedId] = useState<string | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const phone = UserService.getPhoneFromSession();
+    if (!phone) return;
+    UserService.getUserByPhone(phone).then(user => {
+      if (user?.id) setUserId(user.id);
+      const methods = user?.paymentMethods ?? [];
+      setSavedMethods(methods);
+      // Pre-select the default saved method, if any, so returning users don't
+      // have to re-pick it every time.
+      const defaultMethod = methods.find(m => m.isDefault) ?? methods[0];
+      if (defaultMethod?.id) {
+        setMethod('saved');
+        setSelectedSavedId(defaultMethod.id);
+      }
+    }).catch(() => {});
+  }, []);
+
+  const deliveryFee = isAppointment ? 0 : (total > 500 ? 0 : 40);
   const grandTotal = total + deliveryFee;
+
+  const handleConfirmPayment = async () => {
+    if (isAppointment && appointmentPayment) {
+      setIsProcessing(true);
+      setPaymentError(null);
+      try {
+        await AppointmentService.createAppointment({
+          ...appointmentPayment.appointmentInput,
+          status: 'Scheduled',
+        });
+        setOrderPlaced(true);
+      } catch (err) {
+        console.error('Failed to create appointment after payment:', err);
+        setPaymentError('Payment succeeded but we could not confirm your appointment. Please contact support.');
+      } finally {
+        setIsProcessing(false);
+      }
+    } else {
+      setIsProcessing(true);
+      setPaymentError(null);
+      try {
+        await OrderService.createOrder({
+          userId: userId ?? undefined,
+          userPhone: UserService.getPhoneFromSession() ?? undefined,
+          items: cart.map(item => ({
+            medicineId: item.id,
+            name: item.name,
+            image: item.image,
+            price: item.price,
+            quantity: item.quantity,
+          })),
+          subtotal: total,
+          deliveryFee,
+          total: grandTotal,
+          paymentMode: method === 'saved' ? 'CARD' : method.toUpperCase(),
+        });
+        setOrderPlaced(true);
+      } catch (err) {
+        console.error('Failed to create order after payment:', err);
+        setPaymentError('Payment succeeded but we could not place your order. Please contact support.');
+      } finally {
+        setIsProcessing(false);
+      }
+    }
+  };
 
   const formatCardNumber = (val: string) =>
     val.replace(/\D/g, '').slice(0, 16).replace(/(.{4})/g, '$1 ').trim();
@@ -34,11 +122,39 @@ const CheckoutScreen: React.FC = () => {
   };
 
   const canProceed = () => {
+    if (method === 'saved') return !!selectedSavedId;
     if (method === 'upi') return /^[\w.\-]{2,256}@[a-zA-Z]{2,64}$/.test(upiId);
     if (method === 'card')
       return card.number.replace(/\s/g, '').length === 16 && card.expiry.length === 5 && card.cvv.length >= 3 && card.name.trim().length > 2;
     return true;
   };
+
+  if (orderPlaced && isAppointment) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-slate-950 via-gray-900 to-slate-900 flex flex-col items-center justify-center px-8 text-center">
+        <div className="w-24 h-24 rounded-full bg-gradient-to-br from-cyan-400 to-blue-600 flex items-center justify-center mb-6 shadow-2xl shadow-cyan-500/40 animate-bounce">
+          <span className="material-icons-round text-white text-5xl">check_circle</span>
+        </div>
+        <h1 className="text-3xl font-black text-white mb-2">Payment Successful!</h1>
+        <p className="text-gray-400 text-sm mb-1">Your appointment is confirmed.</p>
+        <p className="text-cyan-400 font-bold text-sm mb-10">
+          {[appointmentPayment?.doctorName, appointmentPayment?.date].filter(Boolean).join(' · ') || 'Confirmation sent to your registered contact.'}
+        </p>
+        <button
+          onClick={() => navigate('/profile')}
+          className="w-full max-w-xs py-4 rounded-2xl bg-gradient-to-r from-cyan-500 to-blue-600 text-white font-black uppercase tracking-widest text-sm shadow-xl shadow-cyan-500/30"
+        >
+          View My Appointments
+        </button>
+        <button
+          onClick={() => navigate('/')}
+          className="mt-3 text-gray-500 text-xs font-bold uppercase tracking-widest hover:text-gray-300 transition-colors"
+        >
+          Go to Home
+        </button>
+      </div>
+    );
+  }
 
   if (orderPlaced) {
     return (
@@ -77,7 +193,9 @@ const CheckoutScreen: React.FC = () => {
           >
             <span className="material-icons-round text-gray-800 dark:text-white text-xl">arrow_back</span>
           </button>
-          <h1 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">Checkout</h1>
+          <h1 className="text-xl font-black text-gray-900 dark:text-white tracking-tight">
+            {isAppointment ? 'Consultation Payment' : 'Checkout'}
+          </h1>
         </div>
       </div>
 
@@ -94,8 +212,12 @@ const CheckoutScreen: React.FC = () => {
                 <span className="material-icons-outlined text-cyan-600 dark:text-cyan-400 text-lg">receipt_long</span>
               </div>
               <span className="font-black text-sm text-gray-900 dark:text-white">
-                Order Summary
-                <span className="ml-2 text-[10px] font-bold text-gray-400">({cart.length} item{cart.length !== 1 ? 's' : ''})</span>
+                {isAppointment ? 'Appointment Summary' : (
+                  <>
+                    Order Summary
+                    <span className="ml-2 text-[10px] font-bold text-gray-400">({cart.length} item{cart.length !== 1 ? 's' : ''})</span>
+                  </>
+                )}
               </span>
             </div>
             <span className={`material-icons-round text-gray-400 transition-transform duration-200 ${summaryOpen ? 'rotate-180' : ''}`}>
@@ -105,28 +227,49 @@ const CheckoutScreen: React.FC = () => {
 
           {summaryOpen && (
             <div className="border-t border-gray-100 dark:border-gray-700 px-5 py-3 space-y-3">
-              {cart.map(item => (
-                <div key={item.id} className="flex items-center gap-3">
-                  <img src={item.image} alt={item.name} className="w-10 h-10 rounded-xl object-cover border border-gray-100 dark:border-gray-700 flex-shrink-0" />
-                  <p className="flex-1 text-[11px] font-bold text-gray-700 dark:text-gray-300 line-clamp-1">{item.name}</p>
-                  <span className="text-[11px] font-black text-gray-500 dark:text-gray-400 whitespace-nowrap">×{item.quantity}</span>
-                  <span className="text-xs font-black text-cyan-600 dark:text-cyan-400 whitespace-nowrap">₹{(item.price * item.quantity).toFixed(0)}</span>
+              {isAppointment ? (
+                <div className="space-y-1">
+                  {appointmentPayment?.doctorName && (
+                    <p className="text-[11px] font-bold text-gray-700 dark:text-gray-300">{appointmentPayment.doctorName}</p>
+                  )}
+                  {appointmentPayment?.department && (
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">{appointmentPayment.department}</p>
+                  )}
+                  {appointmentPayment?.hospitalName && (
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">{appointmentPayment.hospitalName}</p>
+                  )}
+                  {(appointmentPayment?.date || appointmentPayment?.time) && (
+                    <p className="text-[11px] text-gray-500 dark:text-gray-400">
+                      {appointmentPayment?.date}{appointmentPayment?.time ? ` · ${appointmentPayment.time}` : ''}
+                    </p>
+                  )}
                 </div>
-              ))}
+              ) : (
+                cart.map(item => (
+                  <div key={item.id} className="flex items-center gap-3">
+                    <img src={item.image} alt={item.name} className="w-10 h-10 rounded-xl object-cover border border-gray-100 dark:border-gray-700 flex-shrink-0" />
+                    <p className="flex-1 text-[11px] font-bold text-gray-700 dark:text-gray-300 line-clamp-1">{item.name}</p>
+                    <span className="text-[11px] font-black text-gray-500 dark:text-gray-400 whitespace-nowrap">×{item.quantity}</span>
+                    <span className="text-xs font-black text-cyan-600 dark:text-cyan-400 whitespace-nowrap">₹{(item.price * item.quantity).toFixed(0)}</span>
+                  </div>
+                ))
+              )}
             </div>
           )}
 
           <div className="border-t border-gray-100 dark:border-gray-700 px-5 py-3 space-y-1.5">
             <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>Subtotal</span>
+              <span>{isAppointment ? 'Consultation Fee' : 'Subtotal'}</span>
               <span className="font-bold">₹{total.toFixed(2)}</span>
             </div>
-            <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
-              <span>Delivery fee</span>
-              {deliveryFee === 0
-                ? <span className="font-bold text-green-500">FREE</span>
-                : <span className="font-bold">₹{deliveryFee.toFixed(2)}</span>}
-            </div>
+            {!isAppointment && (
+              <div className="flex justify-between text-xs text-gray-500 dark:text-gray-400">
+                <span>Delivery fee</span>
+                {deliveryFee === 0
+                  ? <span className="font-bold text-green-500">FREE</span>
+                  : <span className="font-bold">₹{deliveryFee.toFixed(2)}</span>}
+              </div>
+            )}
             <div className="flex justify-between text-sm font-black text-gray-900 dark:text-white pt-1 border-t border-gray-100 dark:border-gray-700">
               <span>Total</span>
               <span className="text-cyan-600 dark:text-cyan-400">₹{grandTotal.toFixed(2)}</span>
@@ -135,22 +278,55 @@ const CheckoutScreen: React.FC = () => {
         </div>
 
         {/* Delivery Address */}
-        <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 px-5 py-4 shadow-sm flex items-start gap-3">
-          <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
-            <span className="material-icons-outlined text-blue-600 dark:text-blue-400 text-lg">location_on</span>
+        {!isAppointment && (
+          <div className="bg-white dark:bg-gray-800 rounded-2xl border border-gray-100 dark:border-gray-700 px-5 py-4 shadow-sm flex items-start gap-3">
+            <div className="w-9 h-9 rounded-xl bg-blue-50 dark:bg-blue-900/30 flex items-center justify-center flex-shrink-0 mt-0.5">
+              <span className="material-icons-outlined text-blue-600 dark:text-blue-400 text-lg">location_on</span>
+            </div>
+            <div className="flex-1">
+              <p className="text-xs font-black text-gray-900 dark:text-white mb-0.5">Deliver to</p>
+              <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">123, Jubilee Hills, Hyderabad, Telangana – 500033</p>
+            </div>
+            <button className="text-cyan-500 text-[10px] font-black uppercase tracking-wider mt-0.5">Change</button>
           </div>
-          <div className="flex-1">
-            <p className="text-xs font-black text-gray-900 dark:text-white mb-0.5">Deliver to</p>
-            <p className="text-[11px] text-gray-500 dark:text-gray-400 leading-relaxed">123, Jubilee Hills, Hyderabad, Telangana – 500033</p>
-          </div>
-          <button className="text-cyan-500 text-[10px] font-black uppercase tracking-wider mt-0.5">Change</button>
-        </div>
+        )}
 
         {/* Payment Method */}
         <div>
           <h2 className="text-sm font-black text-gray-900 dark:text-white mb-3 px-1">Payment Method</h2>
 
           <div className="space-y-3">
+            {/* Saved payment methods */}
+            {savedMethods.length > 0 && (
+              <>
+                {savedMethods.map(pm => {
+                  const isCard = pm.type === 'CARD';
+                  const isUpi = pm.type === 'UPI';
+                  const title = pm.label || (isCard ? `${pm.cardBrand ?? 'Card'} •••• ${pm.cardLast4 ?? ''}` : isUpi ? pm.upiId : pm.otherDetails) || 'Saved method';
+                  const subtitle = isCard
+                    ? `Expires ${pm.cardExpiry ?? '—'}${pm.isDefault ? ' · Default' : ''}`
+                    : (pm.isDefault ? 'Default' : (isUpi ? 'UPI' : 'Other'));
+                  return (
+                    <PaymentCard
+                      key={pm.id}
+                      selected={method === 'saved' && selectedSavedId === pm.id}
+                      onSelect={() => { setMethod('saved'); setSelectedSavedId(pm.id ?? null); }}
+                      icon={isCard ? 'credit_card' : isUpi ? 'account_balance_wallet' : 'payments'}
+                      iconBg="bg-cyan-50 dark:bg-cyan-900/30"
+                      iconColor="text-cyan-600 dark:text-cyan-400"
+                      title={title}
+                      subtitle={subtitle}
+                    />
+                  );
+                })}
+                <div className="flex items-center gap-3 py-1">
+                  <div className="flex-1 h-px bg-gray-100 dark:bg-gray-700" />
+                  <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Or pay with</span>
+                  <div className="flex-1 h-px bg-gray-100 dark:bg-gray-700" />
+                </div>
+              </>
+            )}
+
             {/* UPI */}
             <PaymentCard
               selected={method === 'upi'}
@@ -249,42 +425,59 @@ const CheckoutScreen: React.FC = () => {
             </PaymentCard>
 
             {/* COD */}
-            <PaymentCard
-              selected={method === 'cod'}
-              onSelect={() => setMethod('cod')}
-              icon="payments"
-              iconBg="bg-green-50 dark:bg-green-900/30"
-              iconColor="text-green-600 dark:text-green-400"
-              title="Cash on Delivery"
-              subtitle="Pay when your order arrives"
-            >
-              {method === 'cod' && (
-                <div className="mt-3 flex items-start gap-3 bg-green-50 dark:bg-green-900/20 rounded-xl px-4 py-3 border border-green-100 dark:border-green-800">
-                  <span className="material-icons-outlined text-green-500 text-lg mt-0.5">info</span>
-                  <p className="text-[11px] text-green-700 dark:text-green-300 leading-relaxed font-medium">
-                    Keep exact change ready. Our delivery partner will collect ₹{grandTotal.toFixed(2)} at your doorstep.
-                  </p>
-                </div>
-              )}
-            </PaymentCard>
+            {!isAppointment && (
+              <PaymentCard
+                selected={method === 'cod'}
+                onSelect={() => setMethod('cod')}
+                icon="payments"
+                iconBg="bg-green-50 dark:bg-green-900/30"
+                iconColor="text-green-600 dark:text-green-400"
+                title="Cash on Delivery"
+                subtitle="Pay when your order arrives"
+              >
+                {method === 'cod' && (
+                  <div className="mt-3 flex items-start gap-3 bg-green-50 dark:bg-green-900/20 rounded-xl px-4 py-3 border border-green-100 dark:border-green-800">
+                    <span className="material-icons-outlined text-green-500 text-lg mt-0.5">info</span>
+                    <p className="text-[11px] text-green-700 dark:text-green-300 leading-relaxed font-medium">
+                      Keep exact change ready. Our delivery partner will collect ₹{grandTotal.toFixed(2)} at your doorstep.
+                    </p>
+                  </div>
+                )}
+              </PaymentCard>
+            )}
           </div>
         </div>
       </div>
 
       {/* Bottom CTA */}
       <div className="fixed bottom-0 left-0 right-0 max-w-md mx-auto px-5 pb-8 pt-4 bg-white/90 dark:bg-gray-900/90 backdrop-blur-xl border-t border-gray-100 dark:border-gray-800">
+        {paymentError && (
+          <div className="mb-3 bg-red-50 dark:bg-red-900/20 border border-red-100 dark:border-red-800 rounded-2xl px-4 py-3 flex items-center gap-2">
+            <span className="material-icons-round text-red-500 text-base">error_outline</span>
+            <p className="text-xs text-red-600 dark:text-red-400 font-bold">{paymentError}</p>
+          </div>
+        )}
         <button
-          disabled={!canProceed()}
-          onClick={() => setOrderPlaced(true)}
+          disabled={!canProceed() || isProcessing}
+          onClick={handleConfirmPayment}
           className={[
             'w-full py-4 rounded-2xl font-black uppercase tracking-widest text-sm transition-all duration-300 flex items-center justify-center gap-3',
-            canProceed()
+            canProceed() && !isProcessing
               ? 'bg-gradient-to-r from-cyan-500 to-blue-600 text-white shadow-xl shadow-cyan-500/30 hover:brightness-110 active:scale-[0.98]'
               : 'bg-gray-200 dark:bg-gray-700 text-gray-400 cursor-not-allowed',
           ].join(' ')}
         >
-          <span className="material-icons-round text-xl">lock</span>
-          Place Order · ₹{grandTotal.toFixed(2)}
+          {isProcessing ? (
+            <>
+              <span className="w-4 h-4 border-2 border-white/40 border-t-white rounded-full animate-spin" />
+              Processing…
+            </>
+          ) : (
+            <>
+              <span className="material-icons-round text-xl">lock</span>
+              {isAppointment ? 'Pay' : 'Place Order'} · ₹{grandTotal.toFixed(2)}
+            </>
+          )}
         </button>
       </div>
     </div>

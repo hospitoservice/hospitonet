@@ -39,6 +39,45 @@ export interface PaymentMethod {
   isDefault?: boolean;
 }
 
+export type FavouriteType = 'MEDICINE' | 'DOCTOR' | 'HOSPITAL';
+
+export interface Favourite {
+  id?: string;
+  favouriteType: FavouriteType;
+  refId: string;
+  name?: string;
+  image?: string;
+  subtitle?: string;
+  rating?: number;
+  price?: number;
+  originalPrice?: number;
+  reviews?: number;
+  hospital?: string;
+  tags?: string[];
+  addedAt?: string;
+}
+
+export interface PatientLink {
+  hospitalId: string;
+  hospitalName?: string;
+  patientId: string;
+  linkedAt?: string;
+}
+
+export interface InsurancePolicy {
+  id?: string;
+  planId?: string;
+  provider: string;
+  planName: string;
+  type: 'Health' | 'Life' | 'Accident' | 'Travel';
+  policyNumber?: string;
+  coverageAmount: number;
+  premium: number;
+  status: 'Active' | 'Pending' | 'Expired';
+  startDate?: string;
+  endDate?: string;
+}
+
 export interface UserProfile {
   id?: string;
   userId?: string;
@@ -66,6 +105,9 @@ export interface UserProfile {
   insuranceInformation?: InsuranceInformation;
   appointmentIdList?: string[];
   paymentMethods?: PaymentMethod[];
+  favourites?: Favourite[];
+  patientLinks?: PatientLink[];
+  insurancePolicies?: InsurancePolicy[];
 }
 
 const BASE_URL = '/api/users';
@@ -115,6 +157,18 @@ class UserService {
     return res.json();
   }
 
+  /** Upserts the patient-service link for one hospital — patient records are scoped
+   *  per hospital, so a user can have several of these, unlike the single legacy `patientId`. */
+  async linkPatientForHospital(id: string, link: Omit<PatientLink, 'linkedAt'>): Promise<UserProfile> {
+    const res = await fetch(`${BASE_URL}/${id}/patient-links`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(link),
+    });
+    if (!res.ok) throw new Error(`Failed to link patient for hospital: ${res.status}`);
+    return res.json();
+  }
+
   async addPaymentMethod(id: string, paymentMethod: Omit<PaymentMethod, 'id'>): Promise<UserProfile> {
     const res = await fetch(`${BASE_URL}/${id}/payment-methods`, {
       method: 'POST',
@@ -130,6 +184,42 @@ class UserService {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error(`Failed to remove payment method: ${res.status}`);
+    return res.json();
+  }
+
+  async addFavourite(id: string, favourite: Omit<Favourite, 'id' | 'addedAt'>): Promise<UserProfile> {
+    const res = await fetch(`${BASE_URL}/${id}/favourites`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(favourite),
+    });
+    if (!res.ok) throw new Error(`Failed to add favourite: ${res.status}`);
+    return res.json();
+  }
+
+  async removeFavourite(id: string, favouriteType: FavouriteType, refId: string): Promise<UserProfile> {
+    const res = await fetch(`${BASE_URL}/${id}/favourites/${favouriteType}/${encodeURIComponent(refId)}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to remove favourite: ${res.status}`);
+    return res.json();
+  }
+
+  async addInsurancePolicy(id: string, policy: Omit<InsurancePolicy, 'id'>): Promise<UserProfile> {
+    const res = await fetch(`${BASE_URL}/${id}/insurance-policies`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(policy),
+    });
+    if (!res.ok) throw new Error(`Failed to add insurance policy: ${res.status}`);
+    return res.json();
+  }
+
+  async removeInsurancePolicy(id: string, policyId: string): Promise<UserProfile> {
+    const res = await fetch(`${BASE_URL}/${id}/insurance-policies/${policyId}`, {
+      method: 'DELETE',
+    });
+    if (!res.ok) throw new Error(`Failed to remove insurance policy: ${res.status}`);
     return res.json();
   }
 

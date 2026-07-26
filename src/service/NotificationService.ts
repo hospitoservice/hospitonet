@@ -1,34 +1,77 @@
-import NOTIFICATIONS from '../resources/notifications';
 import UserService from './UserService';
 
 export interface Notification {
   id: string;
+  phone: string;
   type: string;
   title: string;
   message: string;
-  time: string;
   read: boolean;
-  icon: string;
-  color: string;
-  bgColor: string;
+  createdAt: string;
+  actionUrl?: string;
 }
 
-const USER_API_URL = 'http://localhost:8085/api/users';
+const BASE_URL = '/api/notifications';
 
 class NotificationService {
   async getNotifications(): Promise<Notification[]> {
-    try {
-      const phone = UserService.getPhoneFromSession();
-      if (!phone) throw new Error('No session');
-      const res = await fetch(`${USER_API_URL}/${phone}/notifications`);
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const data: Notification[] = await res.json();
-      if (!data.length) throw new Error('Empty response');
-      return data;
-    } catch (error) {
-      console.warn('[NotificationService] API unavailable, using static data:', (error as Error).message);
-      return NOTIFICATIONS as Notification[];
-    }
+    const phone = UserService.getPhoneFromSession();
+    if (!phone) return [];
+    const res = await fetch(`${BASE_URL}/phone/${phone}`);
+    if (!res.ok) throw new Error(`NotificationService: HTTP ${res.status}`);
+    return res.json();
+  }
+
+  async getUnreadCount(): Promise<number> {
+    const phone = UserService.getPhoneFromSession();
+    if (!phone) return 0;
+    const res = await fetch(`${BASE_URL}/phone/${phone}/unread-count`);
+    if (!res.ok) return 0;
+    const data = await res.json();
+    return data.count ?? 0;
+  }
+
+  async markAsRead(id: string): Promise<void> {
+    const res = await fetch(`${BASE_URL}/${id}/read`, { method: 'PATCH' });
+    if (!res.ok) throw new Error(`NotificationService: HTTP ${res.status}`);
+  }
+
+  async markAllAsRead(): Promise<void> {
+    const phone = UserService.getPhoneFromSession();
+    if (!phone) return;
+    const res = await fetch(`${BASE_URL}/phone/${phone}/read-all`, { method: 'PATCH' });
+    if (!res.ok) throw new Error(`NotificationService: HTTP ${res.status}`);
+  }
+
+  async getVapidPublicKey(): Promise<string> {
+    const res = await fetch(`${BASE_URL}/vapid-public-key`);
+    if (!res.ok) throw new Error(`NotificationService: HTTP ${res.status}`);
+    const data = await res.json();
+    return data.publicKey;
+  }
+
+  async subscribePush(subscription: globalThis.PushSubscription): Promise<void> {
+    const phone = UserService.getPhoneFromSession();
+    if (!phone) return;
+    const json = subscription.toJSON();
+    const res = await fetch(`${BASE_URL}/subscribe`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        phone,
+        endpoint: json.endpoint,
+        keys: json.keys,
+      }),
+    });
+    if (!res.ok) throw new Error(`NotificationService: HTTP ${res.status}`);
+  }
+
+  async unsubscribePush(endpoint: string): Promise<void> {
+    await fetch(`${BASE_URL}/subscribe`, {
+      method: 'DELETE',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ endpoint }),
+    });
   }
 }
 

@@ -1,3 +1,5 @@
+import { PatientLink } from './UserService';
+
 export interface FamilyMember {
   id?: string;
   userId?: string;
@@ -10,6 +12,7 @@ export interface FamilyMember {
   mobile?: string;
   email?: string;
   patientId?: string;
+  patientLinks?: PatientLink[];
 }
 
 const BASE_URL = '/api/users';
@@ -46,6 +49,18 @@ class FamilyMemberService {
       method: 'DELETE',
     });
     if (!res.ok) throw new Error(`Failed to delete family member: ${res.status}`);
+  }
+
+  /** Upserts the patient-service link for one hospital for this family member —
+   *  mirrors UserService.linkPatientForHospital, scoped to a specific member. */
+  async linkPatientForHospital(userId: string, memberId: string, link: Omit<PatientLink, 'linkedAt'>): Promise<FamilyMember> {
+    const res = await fetch(`${BASE_URL}/${userId}/family-members/${memberId}/patient-links`, {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(link),
+    });
+    if (!res.ok) throw new Error(`Failed to link patient for hospital: ${res.status}`);
+    return res.json();
   }
 }
 

@@ -7,6 +7,7 @@ import { MEDICINES_CONFIG } from '@/src/resources/MedicinesScreenConfig.js';
 import MedicineService from '../service/MedicineService';
 import UserService from '../service/UserService';
 import AppointmentService from '../service/AppointmentService';
+import FavouritesService from '../service/FavouritesService';
 import CartScreen, { CartItem } from '@/src/screens/CartScreen';
 
 const C = MEDICINES_CONFIG;
@@ -45,6 +46,12 @@ const MedicinesScreen: React.FC = () => {
 
   const [appointments, setAppointments] = useState<Appointment[]>([]);
   const [favourites, setFavourites] = useState<Set<string>>(new Set());
+  const [favouritesBusy, setFavouritesBusy] = useState<Set<string>>(new Set());
+  const [userId, setUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    FavouritesService.getFavouriteRefIds('MEDICINE').then(setFavourites);
+  }, []);
 
   useEffect(() => {
     (async () => {
@@ -54,6 +61,7 @@ const MedicinesScreen: React.FC = () => {
 
         const user = await UserService.getUserByPhone(phone);
         if (!user) return;
+        if (user.id) setUserId(user.id);
 
         const [byId, byMobile] = await Promise.all([
           user.patientId
@@ -90,12 +98,34 @@ const MedicinesScreen: React.FC = () => {
 
   const removeFromCart = (id: string) => setCart(prev => prev.filter(i => i.id !== id));
 
-  const toggleFavourite = (id: string) => {
-    setFavourites(prev => {
-      const next = new Set(prev);
-      next.has(id) ? next.delete(id) : next.add(id);
-      return next;
-    });
+  const toggleFavourite = async (med: Medicine) => {
+    if (!userId || favouritesBusy.has(med.id)) return;
+    const isFav = favourites.has(med.id);
+
+    setFavouritesBusy(prev => new Set(prev).add(med.id));
+    try {
+      if (isFav) {
+        await FavouritesService.removeFavourite(userId, 'MEDICINE', med.id);
+        setFavourites(prev => { const next = new Set(prev); next.delete(med.id); return next; });
+      } else {
+        await FavouritesService.addFavourite(userId, {
+          favouriteType: 'MEDICINE',
+          refId: med.id,
+          name: med.name,
+          image: med.image,
+          subtitle: med.manufacturer,
+          price: med.price,
+          originalPrice: med.originalPrice,
+          rating: med.rating,
+          reviews: med.reviews,
+        });
+        setFavourites(prev => new Set(prev).add(med.id));
+      }
+    } catch (err) {
+      console.error('Failed to update favourite:', err);
+    } finally {
+      setFavouritesBusy(prev => { const next = new Set(prev); next.delete(med.id); return next; });
+    }
   };
 
   const cartCount = cart.reduce((t, i) => t + i.quantity, 0);
@@ -234,8 +264,9 @@ const MedicinesScreen: React.FC = () => {
 
                   {/* Favourite */}
                   <button
-                    onClick={() => toggleFavourite(med.id)}
-                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/80 dark:bg-gray-900/70 backdrop-blur-sm flex items-center justify-center shadow transition-all active:scale-90"
+                    onClick={() => toggleFavourite(med)}
+                    disabled={favouritesBusy.has(med.id)}
+                    className="absolute top-1.5 right-1.5 w-6 h-6 rounded-full bg-white/80 dark:bg-gray-900/70 backdrop-blur-sm flex items-center justify-center shadow transition-all active:scale-90 disabled:opacity-60"
                   >
                     <span className={`material-icons-round text-sm ${isFav ? 'text-red-500' : 'text-gray-300'}`}>
                       {isFav ? 'favorite' : 'favorite_border'}

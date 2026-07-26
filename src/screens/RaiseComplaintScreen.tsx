@@ -50,6 +50,7 @@ const RaiseComplaintScreen: React.FC = () => {
         hospitalId: state?.hospitalId,
         userId,
         patientId: state?.patientId,
+        patientMobile: UserService.getPhoneFromSession() ?? undefined,
         appointmentId: state?.appointmentId,
         subject: subject.trim(),
         against: against.trim(),

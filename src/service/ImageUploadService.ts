@@ -1,15 +1,19 @@
-import { storage, ID } from '@/src/lib/appwriteConfig';
-
-// Create a bucket named "profile-images" in your Appwrite dashboard
-// and set its permissions to allow file creation for "Any" role.
-const BUCKET_ID = 'profile-images';
+// Backed by MongoDB GridFS on user-service (UserImageController) — replaces
+// the previous direct-to-Appwrite upload now that userdb has its own file store.
+const UPLOAD_URL = '/api/users/image';
 
 class ImageUploadService {
   async uploadProfileImage(file: File): Promise<string> {
     const compressed = await this.compressImage(file, 600);
-    const result = await storage.createFile(BUCKET_ID, ID.unique(), compressed);
-    const url = storage.getFileView(BUCKET_ID, result.$id);
-    return url.toString();
+
+    const formData = new FormData();
+    formData.append('file', compressed);
+
+    const res = await fetch(UPLOAD_URL, { method: 'POST', body: formData });
+    if (!res.ok) throw new Error(`Failed to upload profile image: ${res.status}`);
+
+    const { url } = await res.json();
+    return url;
   }
 
   private compressImage(file: File, maxPx: number): Promise<File> {
